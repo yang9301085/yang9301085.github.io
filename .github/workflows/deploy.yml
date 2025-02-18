@@ -68,7 +68,9 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v4
       - name: Install bundler
-        run: bundle install
+        run: |
+          gem install bundler
+          bundle install
       - name: Setup Ruby 💎
         uses: ruby/setup-ruby@v1
         with:
