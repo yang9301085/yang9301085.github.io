@@ -79,7 +79,18 @@ ninja.data = [{
               handler: () => {
                 window.location.href = "/blog/";
               },
-            },{id: "post-a-post-with-image-galleries",
+            },{id: "post-测试网页部署",
+      
+        title: "测试网页部署",
+      
+      description: "这是一个用于测试网页部署的文章",
+      section: "Posts",
+      handler: () => {
+        
+          window.location.href = "/blog/2025/test-web-deployment/";
+        
+      },
+    },{id: "post-a-post-with-image-galleries",
       
         title: "a post with image galleries",
       
