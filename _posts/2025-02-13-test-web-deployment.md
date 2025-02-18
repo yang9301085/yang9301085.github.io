@@ -1,9 +1,9 @@
 ---
 layout: post
-title: 测试网页部署
-date: 2025-02-13 15:17:51
-description: 这是一个用于测试网页部署的文章
-tags: testing deployment
+title: BIOS Notes
+date: 2025-02-18 15:17:51
+description: This is my BIOS Notes.
+tags: BIOS deployment
 categories: sample-posts
 thumbnail: assets/img/9.jpg
 images:
