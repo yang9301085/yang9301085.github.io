@@ -3,7 +3,8 @@ name: Deploy site
 on:
   push:
     branches:
-      - YangBlogPage
+      - master
+      - main
     paths:
       - "assets/**"
       - "**.bib"
@@ -29,7 +30,8 @@ on:
       - "!README.md"
   pull_request:
     branches:
-      - YangBlogPage
+      - master
+      - main
     paths:
       - "assets/**"
       - "**.bib"
