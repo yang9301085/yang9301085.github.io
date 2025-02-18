@@ -67,14 +67,11 @@ jobs:
     steps:
       - name: Checkout 🛎️
         uses: actions/checkout@v4
-      - name: Install bundler
-        run: |
-          gem install bundler
-          bundle install
       - name: Setup Ruby 💎
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3.5"
+          bundler: latest
           bundler-cache: true
       - name: Setup Python 🐍
         uses: actions/setup-python@v5
