@@ -1342,3 +1342,29 @@ ninja-keys::part(ninja-input-wrapper) {
   background-color: var(--global-theme-color);
   color: var(--global-text-color);
 }
+
+// Keep original note screenshots and wide register tables within the article.
+.post-content {
+  overflow-wrap: anywhere;
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  pre {
+    overflow-x: auto;
+    overflow-wrap: normal;
+  }
+}
+
+.note-context {
+  font-size: 0.9rem;
+  color: var(--global-text-color-light);
+}

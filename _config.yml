@@ -2,20 +2,20 @@
 # Site settings
 # -----------------------------------------------------------------------------
 
-title: blank # the website title (if blank, full name will be used instead)
+title: Yang 的 BIOS 笔记
 first_name: Yang
 middle_name: BIOSer.
 last_name: QR
 contact_note: >
-  You can even add a little note about which of these is the best way to reach you.
+  BIOS / UEFI 学习笔记与固件调试记录。
 description: > # the ">" symbol means to ignore newlines until "footer_text:"
-  A simple, whitespace theme for academics. Based on [*folio](https://github.com/bogoli/-folio) design.
+  记录 BIOS / UEFI 启动流程、平台初始化、Setup 界面与板级调试。
 footer_text: >
   Powered by <a href="https://jekyllrb.com/" target="_blank">Jekyll</a> with <a href="https://github.com/alshedivat/al-folio">al-folio</a> theme.
   Hosted by <a href="https://pages.github.com/" target="_blank">GitHub Pages</a>.
   Photos from <a href="https://unsplash.com" target="_blank">Unsplash</a>.
-keywords: jekyll, jekyll-theme, academic-website, portfolio-website # add your own keywords or leave empty
-lang: en # the language of your site (for example: en, fr, cn, ru, etc.)
+keywords: BIOS, UEFI, EDK2, Firmware, PCIe, Debug
+lang: zh-CN
 icon: ⚛️ # the emoji used as the favicon (alternatively, provide image name in /assets/img/)
 
 url: https://yang9301085.github.io/ # the base hostname & protocol for your site
@@ -49,10 +49,10 @@ rss_icon: true
 # -----------------------------------------------------------------------------
 
 navbar_fixed: true
-footer_fixed: true
+footer_fixed: false
 search_enabled: true
-socials_in_search: true
-bib_search: true
+socials_in_search: false
+bib_search: false
 
 # Dimensions
 max_width: 930px
@@ -87,8 +87,8 @@ bing_site_verification: # out your bing-site-verification ID (Bing Webmaster)
 # Blog
 # -----------------------------------------------------------------------------
 
-blog_name: al-folio # blog_name will be displayed in your blog page
-blog_description: a simple whitespace theme for academics
+blog_name: BIOS / UEFI 笔记
+blog_description: 平台初始化、固件开发与调试记录
 permalink: /blog/:year/:title/
 lsi: false # produce an index for related posts
 
@@ -122,13 +122,7 @@ disqus_shortname: al-folio # put your disqus shortname
 # External sources.
 # If you have blog posts published on medium.com or other external sources,
 # you can display them in your blog by adding a link to the RSS feed.
-external_sources:
-  - name: medium.com
-    rss_url: https://medium.com/@al-folio/feed
-  - name: Google Blog
-    posts:
-      - url: https://blog.google/technology/ai/google-gemini-update-flash-ai-assistant-io-2024/
-        published_date: 2024-05-14
+external_sources: []
 
 # -----------------------------------------------------------------------------
 # Newsletter
@@ -173,6 +167,14 @@ kramdown:
 # Includes & excludes
 include: ["_pages", "_scripts"]
 exclude:
+  - tools/
+  - docs/
+  - assets/jupyter/
+  - _pages/cv.md
+  - _pages/dropdown.md
+  - _pages/profiles.md
+  - _pages/teaching.md
+  - _pages/news.md
   - bin/
   - CONTRIBUTING.md
   - CUSTOMIZE.md
@@ -198,23 +200,23 @@ keep_files:
 
 # Plug-ins
 plugins:
-- jekyll-archives
-- jekyll-email-protect
-- jekyll-feed
-- jekyll-get-json
-- jekyll-imagemagick
-- jekyll-jupyter-notebook
-- jekyll-link-attributes
-- jekyll-minifier
-- jekyll-paginate-v2
-- jekyll-regex-replace
-# - jekyll/scholar
-- jekyll-sitemap
-- jekyll-tabs
-- jekyll-terser
-- jekyll-toc
-- jekyll-twitter-plugin
-- jemoji
+  - jekyll-archives
+  - jekyll-email-protect
+  - jekyll-feed
+  - jekyll-get-json
+  - jekyll-imagemagick
+  - jekyll-jupyter-notebook
+  - jekyll-link-attributes
+  - jekyll-minifier
+  - jekyll-paginate-v2
+  - jekyll-regex-replace
+  # - jekyll/scholar
+  - jekyll-sitemap
+  - jekyll-tabs
+  - jekyll-terser
+  - jekyll-toc
+  - jekyll-twitter-plugin
+  - jemoji
 
 # Sitemap settings
 defaults:
@@ -232,6 +234,7 @@ sass:
 
 jekyll-minifier:
   compress_javascript: false # set to false since we are using terser as the js minifier
+  compress_css: false # Sass already compresses CSS; avoid a second cssminify2 pass.
   # exclude: ["robots.txt", "assets/js/search/*.js"]
 
 # -----------------------------------------------------------------------------
@@ -257,8 +260,8 @@ jekyll-archives:
     tag: "/blog/tag/:name/"
     category: "/blog/category/:name/"
 
-display_tags: ["formatting", "images", "links", "math", "code", "blockquotes"] # these tags will be displayed on the front page of your blog
-display_categories: ["external-services"] # these categories will be displayed on the front page of your blog
+display_tags: ["BIOS", "UEFI"]
+display_categories: ["uefi", "platform", "memory", "pcie", "setup", "board", "display", "debug", "security"]
 
 # -----------------------------------------------------------------------------
 # Jekyll Scholar
@@ -349,7 +352,7 @@ external_links:
 # MAKE SURE imagemagick is installed and on your PATH before enabling imagemagick. In a terminal, run:
 #   convert -version
 imagemagick:
-  enabled: true # enables responsive images for your site (recommended, see https://github.com/alshedivat/al-folio/issues/537)
+  enabled: false # Notes use their original images; no generated variants are required.
   widths:
     - 480
     - 800

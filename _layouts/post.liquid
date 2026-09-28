@@ -18,7 +18,7 @@ layout: default
   <header class="post-header">
     <h1 class="post-title">{{ page.title }}</h1>
     <p class="post-meta">
-      Created in {{ page.date | date: '%B %d, %Y' }}
+      {% if page.note_import %}整理于 {{ page.date | date: '%Y-%m-%d' }}{% else %}Created in {{ page.date | date: '%B %d, %Y' }}{% endif %}
       {% if page.author %}by {{ page.author }}{% endif %}
       {% if page.last_updated %}, last updated in {{ page.last_updated | date: '%B %d, %Y' }}{% endif %}
       {% if page.meta %}• {{ page.meta }}{% endif %}
@@ -62,6 +62,9 @@ layout: default
   </header>
 
   <article class="post-content">
+    {% if page.note_import %}
+      <p class="note-context"><a href="{{ '/bios/' | relative_url }}">返回 BIOS 专题索引</a> · 整理自个人笔记，平台相关结论以原记录环境为准。</p>
+    {% endif %}
     {% if page.toc and page.toc.beginning %}
       <div id="table-of-contents">
         {% toc %}
@@ -75,13 +78,6 @@ layout: default
 
   {% if page.citation %}
     {% include citation.liquid %}
-  {% endif %}
-
-  {% if page.related_publications %}
-    <h2>References</h2>
-    <div class="publications">
-      {% bibliography --group_by none --cited_in_order %}
-    </div>
   {% endif %}
 
   {% if site.related_blog_posts and site.related_blog_posts.enabled %}

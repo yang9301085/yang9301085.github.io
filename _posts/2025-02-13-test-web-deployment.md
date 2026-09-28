@@ -1,5 +1,6 @@
 ---
 layout: post
+published: false
 title: BIOS Notes
 date: 2025-02-18 15:17:51
 description: This is my BIOS Notes.
