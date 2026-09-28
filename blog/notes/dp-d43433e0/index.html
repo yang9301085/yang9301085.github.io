@@ -1,0 +1,267 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> <meta http-equiv="X-UA-Compatible" content="IE=edge"> <title> DP++ | Yang 的 BIOS 笔记 </title> <meta name="author" content="Yang BIOSer. QR"> <meta name="description" content="显示与音频：DP++，整理自个人 BIOS / UEFI 笔记。"> <meta name="keywords" content="BIOS, UEFI, EDK2, Firmware, PCIe, Debug"> <link rel="stylesheet" href="/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04"> <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" crossorigin="anonymous"> <link defer rel="stylesheet" href="/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5"> <link defer rel="stylesheet" href="/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772"> <link defer rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap"> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-github.css?591dab5a4e56573bf4ef7fd332894c99" media="" id="highlight_theme_light"> <link rel="shortcut icon" href="data:image/svg+xml,&lt;svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22&gt;&lt;text%20y=%22.9em%22%20font-size=%2290%22&gt;%E2%9A%9B%EF%B8%8F&lt;/text&gt;&lt;/svg&gt;"> <link rel="stylesheet" href="/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e"> <link rel="canonical" href="https://yang9301085.github.io//blog/notes/dp-d43433e0/"> <script src="/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" media="none" id="highlight_theme_dark"> <script>
+    initTheme();
+  </script> </head> <body class="fixed-top-nav sticky-bottom-footer"> <header> <nav id="navbar" class="navbar navbar-light navbar-expand-sm fixed-top" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="/"> Yang 的 BIOS 笔记 </a> <button class="navbar-toggler collapsed ml-auto" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item "> <a class="nav-link" href="/">Yang 的 BIOS 笔记 </a> </li> <li class="nav-item "> <a class="nav-link" href="/bios/">BIOS 笔记 </a> </li> <li class="nav-item active"> <a class="nav-link" href="/blog/">全部文章 </a> </li> <li class="nav-item"> <button id="search-toggle" title="Search" onclick="openSearchModal()"> <span class="nav-link">ctrl k <i class="ti ti-search"></i></span> </button> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="container mt-5" role="main"> <div class="post"> <header class="post-header"> <h1 class="post-title">DP++</h1> <p class="post-meta"> 整理于 2026-09-28 </p> <p class="post-tags"> <a href="/blog/2026"> <i class="fa-solid fa-calendar fa-sm"></i> 2026 </a>   ·   <a href="/blog/tag/bios"> <i class="fa-solid fa-hashtag fa-sm"></i> BIOS</a>   <a href="/blog/tag/uefi"> <i class="fa-solid fa-hashtag fa-sm"></i> UEFI</a>   ·   <a href="/blog/category/display"> <i class="fa-solid fa-tag fa-sm"></i> display</a> </p> </header> <article class="post-content"> <p class="note-context"><a href="/bios/">返回 BIOS 专题索引</a> · 整理自个人笔记，平台相关结论以原记录环境为准。</p> <div id="table-of-contents"> <ul id="toc" class="section-nav"> </ul> </div> <hr> <div id="markdown-content"> <p>DP++: Dual-Mode DisplayPort,DP接口可插适配器输出HDMI、DVI、VGA等信号 DP所需要的信号：1. 至少一组差分信号（TXP，TXN）2. AUX信号3. HPD信号 差分信号和AUX信号 <img src="/assets/img/notes/9f817b1cc810178625b1.png" alt="Pasted image 20250324180426.png" loading="lazy"> HPD信号 <img src="/assets/img/notes/46d5b0cb00dd661eda30.png" alt="Pasted image 20250324180612.png" loading="lazy"> <img src="/assets/img/notes/774f3da95bca3383c60e.png" alt="Pasted image 20250324180623.png" loading="lazy"> <img src="/assets/img/notes/25116dcf8d4bd9438229.png" alt="Pasted image 20250324180633.png" loading="lazy"></p> <p>DP转HDMI、VGA转接器： 内置芯片可以主动把DP信号转成HDMI或者VGA 配置DP++ 所要注意的点： <img src="/assets/img/notes/dab28870002175cf6adf.png" alt="Pasted image 20250324181142.png" loading="lazy"> 如果DP可以显示，但DP++不行，可以检查以下几个地方： 找硬件看DDC信号，没有看下VBIOS有没有配DDC，有配DDP的话看下对应GPIO有没有复用到对应的function DP转接器有没有问题，插上DP转接器再接上HDMI后HPD有没有被拉高，没有的话估计DP++转接器有问题</p> <p><strong>VGA口如果用DP++配置的话会有问题，对于DP转VGA的配置的话，只需配置DP就行</strong></p> <hr> <p>当在dsc中把对应的DDC或者DDI的PCD打开之后： <code class="language-plaintext highlighter-rouge">Intel\AlderLakeBoardPkg\AlderLakeNBoards\BoardVpdPcdsInit\SkuIdAdlNDdr4Rvp.dsc</code></p> <pre><code class="language-C">  gBoardModuleTokenSpaceGuid.VpdPcdDisplayDdiConfigTable| * |{CODE(
+  { 16,
+    {
+     DdiPortDisabled,         // DDI Port A Config : DdiPortDisabled = No LFP is Connected, DdiPortEdp = eDP, DdiPortMipiDsi = MIPI DSI
+     DdiPortDisabled,    // DDI Port B Config : DdiPortDisabled = No LFP is Connected, DdiPortEdp = eDP, DdiPortMipiDsi = MIPI DSI
+     DdiHpdEnable,      // DDI Port A HPD    : DdiHpdDisable = Disable, DdiHpdEnable = Enable HPD
+     DdiHpdEnable,       // DDI Port B HPD    : DdiHpdDisable = Disable, DdiHpdEnable = Enable HPD
+     DdiHpdDisable,      // DDI Port C HPD    : DdiHpdDisable = Disable, DdiHpdEnable = Enable HPD
+     DdiHpdEnable,      // DDI Port 1 HPD    : DdiHpdDisable = Disable, DdiHpdEnable = Enable HPD
+     DdiHpdEnable,       // DDI Port 2 HPD    : DdiHpdDisable = Disable, DdiHpdEnable = Enable HPD
+     DdiHpdDisable,      // DDI Port 3 HPD    : DdiHpdDisable = Disable, DdiHpdEnable = Enable HPD
+     DdiHpdDisable,      // DDI Port 4 HPD    : DdiHpdDisable = Disable, DdiHpdEnable = Enable HPD
+     DdiDdcEnable,         // DDI Port A DDC    : DdiDisable = Disable, DdiDdcEnable = Enable DDC
+     DdiDdcEnable,       // DDI Port B DDC    : DdiDisable = Disable, DdiDdcEnable = Enable DDC
+     DdiDisable,         // DDI Port C DDC    : DdiDisable = Disable, DdiDdcEnable = Enable DDC
+     DdiDdcEnable,         // DDI Port 1 DDC    : DdiDisable = Disable, DdiDdcEnable = Enable DDC
+     DdiDisable,       // DDI Port 2 DDC    : DdiDisable = Disable, DdiDdcEnable = Enable DDC
+     DdiDisable,         // DDI Port 3 DDC    : DdiDisable = Disable, DdiDdcEnable = Enable DDC
+     DdiDisable          // DDI Port 4 DDC    : DdiDisable = Disable, DdiDdcEnable = Enable DDC
+    }
+  })}
+</code></pre> <p><code class="language-plaintext highlighter-rouge">Intel\AlderLakeBoardPkg\AlderLakeNBoards\Library\BoardInitLib\Pei\BoardSaInitPreMemLib.c</code> code会先获取这个PCD然后给到<code class="language-plaintext highlighter-rouge">PcdSaDisplayConfigTable</code></p> <pre><code class="language-C">/**
+  SA Display DDI configuration init function for PEI pre-memory phase.
+  @param[in]  VOID
+  @retval     VOID
+**/
+VOID
+AdlNSaDisplayConfigInit (
+  VOID
+  )
+{
+  VPD_DISPLAY_DDI_CONFIG *SaDisplayDdiConfigTable;
+  SaDisplayDdiConfigTable = PcdGetPtr(VpdPcdDisplayDdiConfigTable);
+  PcdSet32S (PcdSaDisplayConfigTable, (UINTN) SaDisplayDdiConfigTable-&gt;DdiConfigTable);
+  PcdSet16S (PcdSaDisplayConfigTableSize, SaDisplayDdiConfigTable-&gt;Size);
+  return;
+}
+</code></pre> <p><code class="language-plaintext highlighter-rouge">Intel\AlderLakePlatSamplePkg\Library\PeiPolicyUpdateLib\PeiSaPolicyUpdatePreMem.c</code> <code class="language-plaintext highlighter-rouge">PcdSaDisplayConfigTable</code>这个PCD会给到SaDisplayConfigTable，SaDisplayConfigTable会给到<code class="language-plaintext highlighter-rouge">GtPreMemConfig-&gt;DdiConfiguration.DdiPortAConfig</code></p> <pre><code class="language-C">/**
+  UpdatePeiSaPolicyPreMem performs SA PEI Policy initialization
+  @retval EFI_SUCCESS              The policy is installed and initialized.
+**/
+EFI_STATUS
+EFIAPI
+UpdatePeiSaPolicyPreMem (
+  VOID
+  )
+{
+    ...
+    ...
+    ...
+    //
+    // Display DDI Initialization ( default Native GPIO as per board during AUTO case)
+    //
+    CopyMem (SaDisplayConfigTable, (VOID *) (UINTN) PcdGet32 (PcdSaDisplayConfigTable), (UINTN)PcdGet16 (PcdSaDisplayConfigTableSize));
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPortAConfig,          GtPreMemConfig-&gt;DdiConfiguration.DdiPortAConfig,       SaDisplayConfigTable[0]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPortBConfig,          GtPreMemConfig-&gt;DdiConfiguration.DdiPortBConfig,       SaDisplayConfigTable[1]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPortAHpd,             GtPreMemConfig-&gt;DdiConfiguration.DdiPortAHpd,          SaDisplayConfigTable[2]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPortBHpd,             GtPreMemConfig-&gt;DdiConfiguration.DdiPortBHpd,          SaDisplayConfigTable[3]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPortCHpd,             GtPreMemConfig-&gt;DdiConfiguration.DdiPortCHpd,          SaDisplayConfigTable[4]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPort1Hpd,             GtPreMemConfig-&gt;DdiConfiguration.DdiPort1Hpd,          SaDisplayConfigTable[5]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPort2Hpd,             GtPreMemConfig-&gt;DdiConfiguration.DdiPort2Hpd,          SaDisplayConfigTable[6]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPort3Hpd,             GtPreMemConfig-&gt;DdiConfiguration.DdiPort3Hpd,          SaDisplayConfigTable[7]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPort4Hpd,             GtPreMemConfig-&gt;DdiConfiguration.DdiPort4Hpd,          SaDisplayConfigTable[8]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPortADdc,             GtPreMemConfig-&gt;DdiConfiguration.DdiPortADdc,          SaDisplayConfigTable[9]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPortBDdc,             GtPreMemConfig-&gt;DdiConfiguration.DdiPortBDdc,          SaDisplayConfigTable[10]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPortCDdc,             GtPreMemConfig-&gt;DdiConfiguration.DdiPortCDdc,          SaDisplayConfigTable[11]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPort1Ddc,             GtPreMemConfig-&gt;DdiConfiguration.DdiPort1Ddc,          SaDisplayConfigTable[12]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPort2Ddc,             GtPreMemConfig-&gt;DdiConfiguration.DdiPort2Ddc,          SaDisplayConfigTable[13]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPort3Ddc,             GtPreMemConfig-&gt;DdiConfiguration.DdiPort3Ddc,          SaDisplayConfigTable[14]);
+    UPDATE_POLICY (((FSPM_UPD *) FspmUpd)-&gt;FspmConfig.DdiPort4Ddc,             GtPreMemConfig-&gt;DdiConfiguration.DdiPort4Ddc,          SaDisplayConfigTable[15]);
+    ...
+    ...
+    ...
+}
+</code></pre> <p><code class="language-plaintext highlighter-rouge">Intel\ClientOneSiliconPkg\IpBlock\Graphics\LibraryPrivate\PeiDisplayInitLibGen13\PeiDisplayInitLib.c</code></p> <p>在这个Code中会根据<code class="language-plaintext highlighter-rouge">GtPreMemConfig-&gt;DdiConfiguration.DdiPortADdc</code>把不同的DDC参数传到<code class="language-plaintext highlighter-rouge">GpioEnableDpInterface</code>中</p> <pre><code class="language-C">  ///
+  /// Enable DDP CTRLCLK and CTRLDATA pins OR TBT RX and TX pins
+  ///
+ 
+  //
+  // DDI Port A
+  //
+  if (GtPreMemConfig-&gt;DdiConfiguration.DdiPortADdc == DdiDdcEnable) {
+    GpioEnableDpInterface (GpioDdpA);
+  }
+ 
+  //
+  // DDI Port B
+  //
+  if (GtPreMemConfig-&gt;DdiConfiguration.DdiPortBDdc == DdiDdcEnable) {
+    GpioEnableDpInterface (GpioDdpB);
+  }
+
+  //
+  // DDI Port C
+  //
+  if (GtPreMemConfig-&gt;DdiConfiguration.DdiPortCDdc == DdiDdcEnable) {
+    GpioEnableDpInterface (GpioDdpC);
+  }
+
+  //
+  // DDI Port 1
+  //
+  if (GtPreMemConfig-&gt;DdiConfiguration.DdiPort1Ddc == DdiDdcEnable) {
+    GpioEnableDpInterface (GpioDdp1);
+  }
+
+  //
+  // DDI Port 2
+  //
+  if (GtPreMemConfig-&gt;DdiConfiguration.DdiPort2Ddc == DdiDdcEnable) {
+    GpioEnableDpInterface (GpioDdp2);
+  }
+
+  //
+  // DDI Port 3
+  //
+  if (GtPreMemConfig-&gt;DdiConfiguration.DdiPort3Ddc == DdiDdcEnable) {
+    GpioEnableDpInterface (GpioDdp3);
+  }
+
+  //
+  // DDI Port 4
+  //
+  if (GtPreMemConfig-&gt;DdiConfiguration.DdiPort4Ddc == DdiDdcEnable) {
+    GpioEnableDpInterface (GpioDdp4);
+  }
+</code></pre> <p><code class="language-plaintext highlighter-rouge">Intel\ClientOneSiliconPkg\IpBlock\Gpio\LibraryPrivate\PeiDxeSmmGpioPrivateLib\GpioNativePrivateLib.c</code> <code class="language-plaintext highlighter-rouge">GpioEnableDpInterface</code>中的<code class="language-plaintext highlighter-rouge">GpioGetDdpPins</code>会根据不同的DDC参数计算GPIO的数值</p> <pre><code class="language-C">/**
+  This function sets DDP pins into native mode
+  @param[in]  DdpInterface   DDPx interface
+  @retval Status
+**/
+EFI_STATUS
+GpioEnableDpInterface (
+  IN  GPIO_DDP            DdpInterface
+  )
+{
+  EFI_STATUS               Status;
+  UINTN                    Index;
+  GPIO_PAD_NATIVE_FUNCTION *DdpGpio;
+
+  if (GpioOverrideLevel1Enabled ()) {
+    return EFI_SUCCESS;
+  }
+
+  GpioGetDdpPins (
+    DdpInterface,
+    &amp;DdpGpio
+    );
+
+  if (DdpGpio == NULL) {
+    return EFI_UNSUPPORTED;
+  }
+ 
+  for (Index = 0; Index &lt; PCH_GPIO_DDP_NUMBER_OF_PINS; Index++) {
+    Status = GpioSetPadMode (DdpGpio[Index].Pad, DdpGpio[Index].Mode);
+    if (EFI_ERROR (Status)) {
+      return EFI_UNSUPPORTED;
+    }
+
+    Status = GpioConfigurePadIoStandby (DdpGpio[Index].Pad, DdpGpio[Index].IosState, DdpGpio[Index].IosTerm);
+   
+    if (EFI_ERROR (Status)) {
+      return EFI_UNSUPPORTED;
+    }
+  }
+
+  return EFI_SUCCESS;
+}
+</code></pre> <p><code class="language-plaintext highlighter-rouge">Intel\ClientOneSiliconPkg\IpBlock\Gpio\LibraryPrivate\PeiDxeSmmGpioPrivateLib\GpioNativePrivateLibVer2.c</code></p> <pre><code class="language-C">GLOBAL_REMOVE_IF_UNREFERENCED GPIO_PAD_NATIVE_FUNCTION mPchPDdpInterfacePins[][PCH_GPIO_DDP_NUMBER_OF_PINS] =
+{
+  {// DDP1
+    {GPIO_VER2_LP_GPP_E18, GpioPadModeNative1, GpioIosStateHizRx0, GpioIosTermSame},// DDP1_CTRLCLK
+    {GPIO_VER2_LP_GPP_E19, GpioPadModeNative1, GpioIosStateHizRx0, GpioIosTermSame} // DDP1_CTRLDATA
+  },
+  {// DDP2
+    {GPIO_VER2_LP_GPP_E20, GpioPadModeNative1, GpioIosStateHizRx0, GpioIosTermSame},// DDP2_CTRLCLK
+    {GPIO_VER2_LP_GPP_E21, GpioPadModeNative1, GpioIosStateHizRx0, GpioIosTermSame} // DDP2_CTRLDATA
+  },
+  {// DDP3
+    {GPIO_VER2_LP_GPP_D9,  GpioPadModeNative2, GpioIosStateHizRx0, GpioIosTermSame},// DDP3_CTRLCLK
+    {GPIO_VER2_LP_GPP_D10, GpioPadModeNative2, GpioIosStateHizRx0, GpioIosTermSame} // DDP3_CTRLDATA
+  },
+  {// DDP4
+    {GPIO_VER2_LP_GPP_D11, GpioPadModeNative2, GpioIosStateHizRx0, GpioIosTermSame},// DDP4_CTRLCLK
+    {GPIO_VER2_LP_GPP_D12, GpioPadModeNative2, GpioIosStateHizRx0, GpioIosTermSame} // DDP4_CTRLDATA
+  },
+  {// DDPA
+    {GPIO_VER2_LP_GPP_E22, GpioPadModeNative1, GpioIosStateMasked, GpioIosTermSame},// DDPA_CTRLCLK
+    {GPIO_VER2_LP_GPP_E23, GpioPadModeNative1, GpioIosStateMasked, GpioIosTermSame} // DDPA_CTRLDATA
+  },
+  {// DDPB
+    {GPIO_VER2_LP_GPP_H15, GpioPadModeNative1, GpioIosStateMasked, GpioIosTermSame},// DDPB_CTRLCLK
+    {GPIO_VER2_LP_GPP_H17, GpioPadModeNative1, GpioIosStateMasked, GpioIosTermSame} // DDPB_CTRLDATA
+  },
+  {// DDPC
+    {GPIO_VER2_LP_GPP_A21, GpioPadModeNative1, GpioIosStateMasked, GpioIosTermSame},// DDPC_CTRLCLK
+    {GPIO_VER2_LP_GPP_A22, GpioPadModeNative1, GpioIosStateMasked, GpioIosTermSame} // DDPC_CTRLDATA
+  }
+};
+
+
+/**
+  This function provides DDPx interface pins
+  @param[in]  DdpInterface   DDPx interface
+  @param[out] NativePinsTable          Table with pins
+**/
+VOID
+GpioGetDdpPins (
+  IN  GPIO_DDP                    DdpInterface,
+  OUT GPIO_PAD_NATIVE_FUNCTION    **NativePinsTable
+  )
+{
+  UINT32  DdpInterfaceIndex;
+
+  switch (DdpInterface) {
+    case GpioDdp1:
+    case GpioDdp2:
+    case GpioDdp3:
+    case GpioDdp4:
+
+      if (IsPchLp () || IsPchH () || IsPchP () || IsPchN ()) {
+        DdpInterfaceIndex = DdpInterface - GpioDdp1;
+      } else {
+        goto Error;
+      }
+      break;
+     
+    case GpioDdpA:
+    case GpioDdpB:
+    case GpioDdpC:
+
+      if (IsPchLp () || IsPchH () || IsPchP () || IsPchN ()) {
+        DdpInterfaceIndex = (DdpInterface - GpioDdpA) + 4;
+      } else {
+        goto Error;
+      }
+      break;
+    default:
+      goto Error;
+  }
+
+  if (IsPchP () || IsPchN ()) {
+    if (DdpInterfaceIndex &lt; ARRAY_SIZE (mPchPDdpInterfacePins)) {
+      *NativePinsTable = mPchPDdpInterfacePins[DdpInterfaceIndex];
+      return;
+    }
+  } else if (IsPchLp ()) {
+    if (DdpInterfaceIndex &lt; ARRAY_SIZE (mPchLpDdpInterfacePins)) {
+      *NativePinsTable = mPchLpDdpInterfacePins[DdpInterfaceIndex];
+      return;
+    }
+  } else if (IsPchH ()) {
+    if (DdpInterfaceIndex &lt; ARRAY_SIZE (mPchHDdpInterfacePins)) {
+      *NativePinsTable = mPchHDdpInterfacePins[DdpInterfaceIndex];
+      return;
+    }
+  }
+ 
+Error:
+  *NativePinsTable = NULL;
+  ASSERT (FALSE);
+}
+</code></pre> </div> </article> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © Copyright 2026 Yang BIOSer. QR. Powered by <a href="https://jekyllrb.com/" target="_blank" rel="external nofollow noopener">Jekyll</a> with <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> theme. Hosted by <a href="https://pages.github.com/" target="_blank" rel="external nofollow noopener">GitHub Pages</a>. Photos from <a href="https://unsplash.com" target="_blank" rel="external nofollow noopener">Unsplash</a>. </div> </footer> <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script> <script src="/assets/js/bootstrap.bundle.min.js"></script> <script src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha256-Nn1q/fx0H7SNLZMQ5Hw5JLaTRZp0yILA/FRexe19VdI=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/imagesloaded@5.0.0/imagesloaded.pkgd.min.js" integrity="sha256-htrLFfZJ6v5udOG+3kNLINIKh2gvoKqwEhHYfTTMICc=" crossorigin="anonymous"></script> <script defer src="/assets/js/masonry.js?a0db7e5d5c70cc3252b3138b0c91dcaf" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous"></script> <script defer src="/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer src="/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer src="/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer src="/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script async src="https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js"></script> <script async src="https://badge.dimensions.ai/badge.js"></script> <script defer type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" crossorigin="anonymous"></script> <script src="/assets/js/mathjax-setup.js?a5bb4e6a542c546dd929b24b8b236dfd"></script> <script defer src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6" crossorigin="anonymous"></script> <script defer src="/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script> <script type="module" src="/assets/js/search/ninja-keys.min.js?a3446f084dcaecc5f75aa1757d087dcf"></script> <ninja-keys hidebreadcrumbs noautoloadmdicons placeholder="Type to start searching"></ninja-keys> <script src="/assets/js/search-setup.js?6c304f7b1992d4b60f7a07956e52f04a"></script> <script src="/assets/js/search-data.js"></script> <script src="/assets/js/shortcut-key.js?6f508d74becd347268a7f822bca7309d"></script> </body> </html>

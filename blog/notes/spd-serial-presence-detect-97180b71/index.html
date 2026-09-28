@@ -1,0 +1,159 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> <meta http-equiv="X-UA-Compatible" content="IE=edge"> <title> SPD (serial presence detect) | Yang 的 BIOS 笔记 </title> <meta name="author" content="Yang BIOSer. QR"> <meta name="description" content="内存与 SPD：SPD (serial presence detect)，整理自个人 BIOS / UEFI 笔记。"> <meta name="keywords" content="BIOS, UEFI, EDK2, Firmware, PCIe, Debug"> <link rel="stylesheet" href="/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04"> <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" crossorigin="anonymous"> <link defer rel="stylesheet" href="/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5"> <link defer rel="stylesheet" href="/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772"> <link defer rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap"> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-github.css?591dab5a4e56573bf4ef7fd332894c99" media="" id="highlight_theme_light"> <link rel="shortcut icon" href="data:image/svg+xml,&lt;svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22&gt;&lt;text%20y=%22.9em%22%20font-size=%2290%22&gt;%E2%9A%9B%EF%B8%8F&lt;/text&gt;&lt;/svg&gt;"> <link rel="stylesheet" href="/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e"> <link rel="canonical" href="https://yang9301085.github.io//blog/notes/spd-serial-presence-detect-97180b71/"> <script src="/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" media="none" id="highlight_theme_dark"> <script>
+    initTheme();
+  </script> </head> <body class="fixed-top-nav sticky-bottom-footer"> <header> <nav id="navbar" class="navbar navbar-light navbar-expand-sm fixed-top" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="/"> Yang 的 BIOS 笔记 </a> <button class="navbar-toggler collapsed ml-auto" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item "> <a class="nav-link" href="/">Yang 的 BIOS 笔记 </a> </li> <li class="nav-item "> <a class="nav-link" href="/bios/">BIOS 笔记 </a> </li> <li class="nav-item active"> <a class="nav-link" href="/blog/">全部文章 </a> </li> <li class="nav-item"> <button id="search-toggle" title="Search" onclick="openSearchModal()"> <span class="nav-link">ctrl k <i class="ti ti-search"></i></span> </button> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="container mt-5" role="main"> <div class="post"> <header class="post-header"> <h1 class="post-title">SPD (serial presence detect)</h1> <p class="post-meta"> 整理于 2026-09-28 </p> <p class="post-tags"> <a href="/blog/2026"> <i class="fa-solid fa-calendar fa-sm"></i> 2026 </a>   ·   <a href="/blog/tag/bios"> <i class="fa-solid fa-hashtag fa-sm"></i> BIOS</a>   <a href="/blog/tag/uefi"> <i class="fa-solid fa-hashtag fa-sm"></i> UEFI</a>   ·   <a href="/blog/category/memory"> <i class="fa-solid fa-tag fa-sm"></i> memory</a> </p> </header> <article class="post-content"> <p class="note-context"><a href="/bios/">返回 BIOS 专题索引</a> · 整理自个人笔记，平台相关结论以原记录环境为准。</p> <div id="table-of-contents"> <ul id="toc" class="section-nav"> <li class="toc-entry toc-h2"><a href="#spd--serial-presence-detect-%E5%86%85%E5%AD%98%E5%AD%98%E5%9C%A8%E6%A3%80%E6%B5%8B">SPD : serial presence detect 内存存在检测</a></li> </ul> </div> <hr> <div id="markdown-content"> <h2 id="spd--serial-presence-detect-内存存在检测">SPD : serial presence detect 内存存在检测</h2> <ul> <li>是一种访问内存模块有关信息的标准化方式</li> <li>SPD数据提供关于存储器通道上的所有模块的关键信息，并且旨在由系统的BIOS使用，以便正确地初始化和优化系统存储器通道。这个芯片中记录了内存太多重要信息，从频率、时序和电压，到制造厂商、制造日期等，每一个参数都会在它正式出厂前，由内存厂商依据其实际性能参数输入到SPD中</li> <li>一个通过串行接口传输并且掉电后不会丢失数据的带电可擦可编程只读存储器（EEPROM）</li> <li>在Intel 平台上 SPD相关信息初始化在<code class="language-plaintext highlighter-rouge">Intel\ClientOneSiliconPkg\IpBlock\MemoryInit\Adl\LibraryPrivate\PeiMemoryInitLib\Source\SpdProcessing\MrcSpdProcessing.c</code>中</li> <li>DDR4 SPD SPEC（附件或条目未随文发布）</li> <li>SPD Address Map <img src="/assets/img/notes/88aa79dceb3cc68c761f.png" alt="Pasted image 20240126151500.png" loading="lazy"> </li> </ul> <hr> <p>以Kingston DDR4 内存，Micron DRAM 为例，下面是这跟内存条 SPD 中 数据：</p> <p>000 23 11 0C 02 86 29 00 08 00 60 00 03 01 03 00 00 010 00 00 07 0D F8 0F 00 00 6E 6E 6E 11 00 6E F0 0A 020 20 08 00 05 00 A8 1B 28 28 00 78 00 14 3C 00 00 030 00 00 00 00 00 00 00 00 00 00 00 00 16 36 16 36 040 16 36 16 36 00 00 16 36 16 36 16 36 16 36 00 00 050 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 060 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 070 00 00 00 00 00 00 9C B5 00 00 00 00 E7 D6 E7 D8 080 11 01 60 00 00 00 00 00 00 00 00 00 00 00 00 00 090 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0B0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0C0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0D0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0E0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0F0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 72 AB 100 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 110 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 120 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 130 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 140 01 98 04 22 32 5D 5A C7 98 4B 46 33 36 30 30 43 150 31 38 44 34 2F 31 36 47 58 20 20 20 20 00 80 2C 160 45 00 00 00 00 00 00 00 00 00 00 00 45 00 00 88 170 07 39 35 35 33 37 30 33 00 00 00 01 00 00 00 00 180 0C 4A 17 20 00 00 00 00 00 A3 00 00 05 F8 0F 00 190 00 50 62 62 10 AD 78 F0 0A 20 08 00 05 00 9F 20 1A0 28 00 00 00 00 00 00 00 00 FB 8D 00 D8 D8 F6 BA 1B0 00 00 00 00 00 00 00 00 A3 00 00 06 F4 07 00 00 1C0 56 61 61 10 C0 56 F0 0A 20 08 00 05 00 C0 26 26 1D0 00 00 00 00 00 00 00 00 AF AF C2 89 89 B2 AD 00 1E0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1F0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00</p> <hr> <p>通过软件解析得到一下数值： <img src="/assets/img/notes/06b27cf15812167be261.png" alt="_H__spd_Kingston%20KF3600C18D4-16GX.html.png" loading="lazy"></p> <p>关于SPD中 memory timing 的计算：</p> <table> <thead> <tr> <th>Manufacture</th> <th>Module ID</th> </tr> </thead> <tbody> <tr> <td>KingBank</td> <td>0x920B</td> </tr> <tr> <td>CUSO</td> <td>0xBC88</td> </tr> <tr> <td>Corsair</td> <td>0x9E02</td> </tr> <tr> <td>KingSton</td> <td>0x9801</td> </tr> </tbody> </table> <table> <thead> <tr> <th>DRAM</th> <th>DRAM ID</th> </tr> </thead> <tbody> <tr> <td>CXMT</td> <td>0x918A</td> </tr> <tr> <td>Micron</td> <td>0x2C80</td> </tr> <tr> <td>Hynix</td> <td>0xAD80</td> </tr> <tr> <td>Samsung</td> <td>0xCE80</td> </tr> <tr> <td> </td> <td> </td> </tr> </tbody> </table> <pre><code class="language-C">static BOOLEAN GetChannelDimmtRAS (IN OUT MrcParameters *const MrcData)
+{
+  const MrcInput        *Inputs;
+  const MrcControllerIn *ControllerIn;
+  const MrcChannelIn    *ChannelIn;
+  const MrcDimmIn       *DimmIn;
+  const MrcSpd          *Spd;
+  MrcDebug              *Debug;
+  MrcOutput             *Outputs;
+  MrcControllerOut      *ControllerOut;
+  MrcChannelOut         *ChannelOut;
+  MrcDimmOut            *DimmOut;
+  MrcTimeBase           *TimeBase;
+  MrcProfile            Profile;
+  UINT8                 Controller;
+  UINT8                 Channel;
+  UINT8                 Dimm;
+  UINT32                tCKmin
+  UINT32                TimingMTB;
+  INT32                 MediumTimebase;
+  UINT32                Actual[MAX_PROFILE];
+  UINT32                Calculated;
+
+  const SPD_EXTREME_MEMORY_PROFILE_DATA_2_0  *Data;
+  UINT32                                     Index;
+
+  Inputs  = &amp;MrcData-&gt;Inputs;
+  Outputs = &amp;MrcData-&gt;Outputs;
+  Debug   = &amp;Outputs-&gt;Debug;
+
+  MRC_DEBUG_MSG (Debug, MSG_LEVEL_NOTE, "  %s:\n  %s\n", tRASString, HeaderString);
+
+  //
+  // Find the smallest timing value for all the given DIMMs, for all the profiles.
+  //
+  for (Profile = STD_PROFILE; Profile &lt; MAX_PROFILE; Profile++) {
+    if (NeedIgnoreXmp(MrcData, Profile)) {
+      continue;
+    }
+    Actual[Profile] = 0;
+    for (Controller = 0; Controller &lt; MAX_CONTROLLER; Controller++) {
+      ControllerIn  = &amp;Inputs-&gt;Controller[Controller];
+      ControllerOut = &amp;Outputs-&gt;Controller[Controller];
+      for (Channel = 0; Channel &lt; MAX_CHANNEL; Channel++) {
+        ChannelIn   = &amp;ControllerIn-&gt;Channel[Channel];
+        ChannelOut  = &amp;ControllerOut-&gt;Channel[Channel];
+        for (Dimm = 0; Dimm &lt; MAX_DIMMS_IN_CHANNEL; Dimm++) {
+          DimmIn  = &amp;ChannelIn-&gt;Dimm[Dimm];
+          DimmOut = &amp;ChannelOut-&gt;Dimm[Dimm];
+          if (DIMM_PRESENT != DimmOut-&gt;Status) {
+            continue;
+          }
+          Spd            = &amp;DimmIn-&gt;Spd.Data;
+          Calculated     = 0;
+          tCKmin         = ChannelOut-&gt;Timing[Profile].tCK;
+          TimeBase       = &amp;ChannelOut-&gt;TimeBase[Dimm][Profile];
+          MediumTimebase = TimeBase-&gt;Mtb;
+          switch (Profile) {
+            case XMP_PROFILE1:
+            case XMP_PROFILE2:
+            case XMP_PROFILE3:
+            case USER_PROFILE4:
+            case USER_PROFILE5:
+              Calculated = 0;
+              if (!XmpSupport(DimmOut, Profile)) {
+                break;
+              }
+              Index       = Profile - XMP_PROFILE1;
+              switch (DimmOut-&gt;DdrType) {
+                case MRC_DDR_TYPE_DDR4:
+                  Data        = &amp;Spd-&gt;Ddr4.EndUser.Xmp.Data[Index];
+                  TimingMTB   = ((UINT32) (Data-&gt;tRASMintRCMinUpper.Bits.tRASminUpper) &lt;&lt; 8) | (UINT32) (Data-&gt;tRASmin.Bits.tRASmin);
+                  Calculated  = (tCKmin == 0) ? 0 : ((MediumTimebase * TimingMTB) - (tCKmin / 100) + (tCKmin - 1)) / tCKmin;
+                  //yqr-tCAS debug-s
+                  IoWrite32(0x72,0xC0);
+                  IoWrite32(0x73,Calculated);
+                  //yqr-tCAS debug-e
+                  break;
+                case MRC_DDR_TYPE_DDR5:
+                  Calculated  = PicoSecondsToClocks (Spd-&gt;Ddr5.EndUser.Xmp.Data[Index].tRASmin.Bits.tRASmin, tCKmin);
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case CUSTOM_PROFILE1:
+              if (DimmIn-&gt;Timing.tRAS &gt; 0) {
+                Calculated = DimmIn-&gt;Timing.tRAS;
+                break;
+              } else {
+                // In AUTO mode, so no break.
+              }
+              /*FALLTHROUGH*/
+            case STD_PROFILE:
+            default:
+              if (tCKmin &gt; 0) {
+                if (MRC_DDR_TYPE_DDR5 == DimmOut-&gt;DdrType) {
+                  Calculated  = PicoSecondsToClocks (Spd-&gt;Ddr5.Base.tRASmin.Bits.tRASmin, tCKmin);
+                } else {
+                  TimingMTB = ((UINT32) (Spd-&gt;Ddr4.Base.tRASMintRCMinUpper.Bits.tRASminUpper) &lt;&lt; 8) | (UINT32) (Spd-&gt;Ddr4.Base.tRASmin.Bits.tRASmin);
+                  if (Outputs-&gt;Lpddr) {
+                    Calculated = DIVIDECEIL ((42000000 - (tCKmin / 100)), tCKmin); // 42ns
+                  } else {
+                    Calculated = ((MediumTimebase * TimingMTB) - (tCKmin / 100) + (tCKmin - 1)) / tCKmin;
+                  }
+                }
+              }
+              break;
+          } //switch
+
+          Actual[Profile] = MAX (Actual[Profile], Calculated);
+          MRC_DEBUG_MSG (
+            Debug,
+            MSG_LEVEL_NOTE,
+            "  % 7u % 10u % 8u % 5u %6u\n",
+            Profile,
+            Controller,
+            Channel,
+            Dimm,
+            Calculated
+          );
+        } //Dimm
+      } //Channel
+    } //Controller
+  } //Profile
+
+  //
+  // Set the best case timing for all controllers/channels/dimms, for each profile.
+  //
+  MRC_DEBUG_MSG (Debug, MSG_LEVEL_NOTE, "    %s%u:", BestCaseString, MAX_PROFILE - 1);
+  for (Profile = STD_PROFILE; Profile &lt; MAX_PROFILE; Profile++) {
+    if (NeedIgnoreXmp(MrcData, Profile)) {
+      continue;
+    }
+    for (Controller = 0; Controller &lt; MAX_CONTROLLER; Controller++) {
+      ControllerOut = &amp;Outputs-&gt;Controller[Controller];
+      for (Channel = 0; Channel &lt; MAX_CHANNEL; Channel++) {
+        ChannelOut = &amp;ControllerOut-&gt;Channel[Channel];
+        ChannelOut-&gt;Timing[Profile].tRAS = (UINT16) Actual[Profile];
+      }
+    }
+    MRC_DEBUG_MSG (Debug, MSG_LEVEL_NOTE, " %u", Actual[Profile]);
+  }
+
+  //yqr-tCAS debug-s
+  IoWrite32(0x72,0xC4);
+  IoWrite32(0x73,Actual[XMP_PROFILE1]);
+  //yqr-tCAS debug-e
+ 
+  MRC_DEBUG_MSG (Debug, MSG_LEVEL_NOTE, "\n");
+ 
+  return TRUE;
+
+}
+</code></pre> <hr> </div> </article> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © Copyright 2026 Yang BIOSer. QR. Powered by <a href="https://jekyllrb.com/" target="_blank" rel="external nofollow noopener">Jekyll</a> with <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> theme. Hosted by <a href="https://pages.github.com/" target="_blank" rel="external nofollow noopener">GitHub Pages</a>. Photos from <a href="https://unsplash.com" target="_blank" rel="external nofollow noopener">Unsplash</a>. </div> </footer> <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script> <script src="/assets/js/bootstrap.bundle.min.js"></script> <script src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha256-Nn1q/fx0H7SNLZMQ5Hw5JLaTRZp0yILA/FRexe19VdI=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/imagesloaded@5.0.0/imagesloaded.pkgd.min.js" integrity="sha256-htrLFfZJ6v5udOG+3kNLINIKh2gvoKqwEhHYfTTMICc=" crossorigin="anonymous"></script> <script defer src="/assets/js/masonry.js?a0db7e5d5c70cc3252b3138b0c91dcaf" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous"></script> <script defer src="/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer src="/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer src="/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer src="/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script async src="https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js"></script> <script async src="https://badge.dimensions.ai/badge.js"></script> <script defer type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" crossorigin="anonymous"></script> <script src="/assets/js/mathjax-setup.js?a5bb4e6a542c546dd929b24b8b236dfd"></script> <script defer src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6" crossorigin="anonymous"></script> <script defer src="/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script> <script type="module" src="/assets/js/search/ninja-keys.min.js?a3446f084dcaecc5f75aa1757d087dcf"></script> <ninja-keys hidebreadcrumbs noautoloadmdicons placeholder="Type to start searching"></ninja-keys> <script src="/assets/js/search-setup.js?6c304f7b1992d4b60f7a07956e52f04a"></script> <script src="/assets/js/search-data.js"></script> <script src="/assets/js/shortcut-key.js?6f508d74becd347268a7f822bca7309d"></script> </body> </html>

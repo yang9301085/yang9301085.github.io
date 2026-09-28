@@ -1,0 +1,595 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> <meta http-equiv="X-UA-Compatible" content="IE=edge"> <title> PS2 | Yang 的 BIOS 笔记 </title> <meta name="author" content="Yang BIOSer. QR"> <meta name="description" content="板级 IO 与电源：PS2，整理自个人 BIOS / UEFI 笔记。"> <meta name="keywords" content="BIOS, UEFI, EDK2, Firmware, PCIe, Debug"> <link rel="stylesheet" href="/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04"> <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" crossorigin="anonymous"> <link defer rel="stylesheet" href="/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5"> <link defer rel="stylesheet" href="/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772"> <link defer rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap"> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-github.css?591dab5a4e56573bf4ef7fd332894c99" media="" id="highlight_theme_light"> <link rel="shortcut icon" href="data:image/svg+xml,&lt;svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22&gt;&lt;text%20y=%22.9em%22%20font-size=%2290%22&gt;%E2%9A%9B%EF%B8%8F&lt;/text&gt;&lt;/svg&gt;"> <link rel="stylesheet" href="/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e"> <link rel="canonical" href="https://yang9301085.github.io//blog/notes/ps2-f64a08f7/"> <script src="/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" media="none" id="highlight_theme_dark"> <script>
+    initTheme();
+  </script> </head> <body class="fixed-top-nav sticky-bottom-footer"> <header> <nav id="navbar" class="navbar navbar-light navbar-expand-sm fixed-top" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="/"> Yang 的 BIOS 笔记 </a> <button class="navbar-toggler collapsed ml-auto" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item "> <a class="nav-link" href="/">Yang 的 BIOS 笔记 </a> </li> <li class="nav-item "> <a class="nav-link" href="/bios/">BIOS 笔记 </a> </li> <li class="nav-item active"> <a class="nav-link" href="/blog/">全部文章 </a> </li> <li class="nav-item"> <button id="search-toggle" title="Search" onclick="openSearchModal()"> <span class="nav-link">ctrl k <i class="ti ti-search"></i></span> </button> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="container mt-5" role="main"> <div class="post"> <header class="post-header"> <h1 class="post-title">PS2</h1> <p class="post-meta"> 整理于 2026-09-28 </p> <p class="post-tags"> <a href="/blog/2026"> <i class="fa-solid fa-calendar fa-sm"></i> 2026 </a>   ·   <a href="/blog/tag/bios"> <i class="fa-solid fa-hashtag fa-sm"></i> BIOS</a>   <a href="/blog/tag/uefi"> <i class="fa-solid fa-hashtag fa-sm"></i> UEFI</a>   ·   <a href="/blog/category/board"> <i class="fa-solid fa-tag fa-sm"></i> board</a> </p> </header> <article class="post-content"> <p class="note-context"><a href="/bios/">返回 BIOS 专题索引</a> · 整理自个人笔记，平台相关结论以原记录环境为准。</p> <div id="table-of-contents"> <ul id="toc" class="section-nav"> <li class="toc-entry toc-h1"><a href="#debug">Debug</a></li> </ul> </div> <hr> <div id="markdown-content"> <blockquote> <p>2024-11-29 10:09:53</p> <p>这几天遇到PS2键盘鼠标的问题：</p> <p>PS2二合一的板子。就是说这个接口既可以插鼠标，也可以插键盘</p> <p><strong>问题现象</strong>：只识别鼠标，键盘无法识别，接键盘PSOT过程中键盘灯会亮灭三次，然后灭掉，进OS后没有响应，DM里面没有PS2键盘设备，PS2接口插PS2鼠标时有功能</p> </blockquote> <h1 id="debug">Debug</h1> <pre><code class="language-C">/**
+    Detects the presence of Keyboard and Mouse in KBC port.
+    @param    None. Keyboard interface is disabled.
+
+    @retval    Ps2KbdDetected and Ps2MouseDetected variable set according the device presence
+   
+**/
+EFI_STATUS
+DetectPS2KeyboardAndMouse ()
+{
+    UINT16      wCount;
+    UINT8       bData;
+    BOOLEAN     bAck = FALSE;
+
+    if(Ps2KbdMouseDetected) {
+        // Ps2Keyboard and Mouse Detected already
+        return EFI_SUCCESS;
+    }
+    Ps2KbdMouseDetected=TRUE;
+
+    // FALSE is passing as argument to intimate, according to DETECT_PS2_MOUSE value, perform Mouse Detection
+    DetectPs2Mouse(FALSE);
+    if ( DetectPs2KeyboardValue )
+        // PROGRESS_CODE(DXE_KEYBOARD_DETECT);
+        Write8042CommandByte (0x6d);
+        KBCGetData();                                       // Dummy read
+        for (wCount = 0; wCount &lt; 3; wCount++) {
+            // Disable Scanning
+            if (!ReadDevice(KBD_DISABLE_SCANNING, &amp;bData, KB_ACK_COM)) break;
+            if (IoRead8(KBC_CMDSTS_PORT) &amp; 0x40) {              // Time out error
+                gBS-&gt;Stall(6000);           // 6 msec
+                // After power-up some junk data comes from KBD. If not eaten
+                // other command will fail.
+                KBCGetData();
+            }
+        }
+        DisableKeyboard();
+        KBCGetData();  
+        /**
+        ** 这里就是键盘灯亮灭三次的地方
+        ** 我在这里debug 函数ReadDevice(KBD_RESET, &amp;bData, KB_ACK_COM)是否会返回ACK，
+        ** 结果是否定的，返回的是0xFE，换了个键盘也是这种情况
+        */
+        // 3 times retry on keyboard reset
+        for (wCount = 0; wCount &lt; 3; wCount++) {
+            if (!ReadDevice(KBD_RESET, &amp;bData, KB_ACK_COM)) {   // ACK received
+                bAck = TRUE;
+                break;
+            } else {        
+                KBCGetData();                       // Dummy read
+            }
+        }
+
+        if (bAck) {                             //If not not Keyboard
+            if (ObFullRead() == 0xAA) {     // Reset successful
+                Ps2KbdDetected=TRUE;
+            } else if (Read8042(0xAB)) {       // On Success returns 0
+                // 0x01 if Clock line stuck low, 0x02 if clock line stuck high,
+                // 0x03 if data line stuck low, and 0x04 if data line stuck high  
+                Ps2KbdDetected=FALSE;
+            }
+        }
+    } else {
+        Ps2KbdDetected = TRUE;
+        KBDEnableState = TRUE;
+    }
+    return EFI_SUCCESS;
+}
+</code></pre> <hr> <p>然后我在PS2接口上接上PS2一分二的线，接到键盘接口之后键盘有效，POST过程中键盘灯只会闪一下，也就是说在keyboardDetect函数在做kbreset的动作第一次的键盘就返回了ACK</p> <pre><code class="language-SDL">TOKEN
+    Name  = "INSTALL_KEYBOARD_MOUSE_ALWAYS"
+    Value  = "0"
+    Help  = "1 - Install the Keyboard- SimpleTextIn, Mouse - AbsPointer Always, 0 - Install the Keyboard- SimpleTextIn, Mouse - AbsPointer only if the device is present at the time of detection."
+    TokenType = Boolean
+    TargetH = Yes
+End
+</code></pre> <p>这个<code class="language-plaintext highlighter-rouge">INSTALL_KEYBOARD_MOUSE_ALWAYS</code>的Token，如果把它置1，会把<code class="language-plaintext highlighter-rouge">Ps2KbdDetected</code>变量直接赋值为<code class="language-plaintext highlighter-rouge">Enable</code>,也不会做键盘检查的动作，但是在进OS后DM就会错误的把PS2键盘识别成鼠标</p> <hr> <pre><code class="language-C">/**
+    Auto detection of KB/MS using AMI KB-5.  This code will
+    allow the connector swap of Keyboard and PS2 Mouse i.e.
+    keyboard can be connected to PS2 Mouse connector and
+    vice-versa.
+
+    @param    None. AMI KB-5 present in the system, keyboard controller
+              BAT is complete.
+
+    @retval   None
+
+
+    @note     This code should be used only if the motherboard has
+              AMI KB-5 which is also available in IO chipsets having KBC
+              e.g. SMC932, etc.
+
+**/
+
+VOID
+AutodetectKbdMousePorts ()
+{
+    UINT8           bData, Index;
+    EFI_STATUS      Status;
+
+    Status = IbFreeTimeout(IbFreeMaxTimeoutValue);
+    if (EFI_ERROR(Status)) {
+        return;
+    }
+    WriteKeyboardCommand(0x60);         // Lock KBD
+    IoRead8(KBC_DATA_PORT);             // Discard any data
+
+    Write8042CommandByte(0x74);         // KBD and Aux device disabled
+
+    // Check for KBC version
+    IoRead8(KBC_DATA_PORT);             // Discard any data
+    WriteKeyboardCommand(0xa1);         //
+    if (!ObFullReadTimeout(&amp;bData, 20, TRUE) &amp;&amp; bData == 0x35) {
+
+        WriteKeyboardCommand(0x60);
+        WriteKeyboardData(4);
+
+        for (Index = 6; Index; Index--){  // Read max. 6 data
+            if (ObFullReadTimeout(&amp;bData, 10, TRUE)) break;
+        }
+
+        WriteKeyboardCommand(0xa7);         // Disable Mouse
+        WriteKeyboardCommand(0xc8);         //  Select Primary
+
+        WriteKeyboardData(rKeyboardID);     // Read KBD ID
+
+        ObFullReadTimeout(&amp;bData, 1000, TRUE);      // Read ACK
+
+        if (bData == rKeyboardID) goto PortSwap;
+
+        if (bData == KB_ACK_COM) {
+            ObFullReadTimeout(&amp;bData, 100, TRUE);
+            // When Mouse is connected to KBD port, control goes to PortSwap here
+            if (!bData) goto PortSwap;
+            ObFullReadTimeout(&amp;bData, 100, TRUE);
+        }
+        bData = IoRead8(KBC_CMDSTS_PORT);
+        // When KBD is connected to the KBD port, control returns here
+        if (!(bData &amp; KBC_TIMEOUT_ERR)) return;
+
+        WriteKeyboardCommand(0xD4);         // Secondary Port
+        WriteKeyboardData(rKeyboardID);     // Read KBD ID
+        ObFullReadTimeout(&amp;bData, 1000, TRUE);
+        if (bData == rKeyboardID) return;
+        if (bData == KB_ACK_COM) {
+            // When Mouse alone is connected to Mouse support, control returns here
+            if (!ObFullRead()) return;
+            ObFullRead();
+        }
+        bData = IoRead8(KBC_CMDSTS_PORT);
+        // When KBD alone is connected to Mouse port, no time out error and control
+        //  goes to portswap.
+        if (bData &amp; KBC_TIMEOUT_ERR) return;
+
+PortSwap:
+        WriteKeyboardCommand(0xC9);
+        return;
+    }
+}
+</code></pre> <p>这个是函数是实现Keyboard Mouse auto swap功能 ，起初我一直以为是这里出现了问题，一直在这个函数上面浪费了不少时间，不过我发现了另一个问题，就是 Check for KBC version 那里，代码里确认条件是0x35，但我实际debug的结果是0x48，虽然改成0x48之后代码会进入if判断，但毕竟是keyboarddetect的时候就出现了错误，现在再debug这个函数也没有什么太大的意义了</p> <hr> <p>现在回到 <code class="language-plaintext highlighter-rouge">DetectPS2KeyboardAndMouse ()</code>这个函数，在做keyboardReset动作的时候会用<code class="language-plaintext highlighter-rouge">ReadDevice(KBD_RESET, &amp;bData, KB_ACK_COM)</code>这个函数来获取ACK，然后把TURE给到<code class="language-plaintext highlighter-rouge">bAck</code> 从而确定键盘存在,问题就出在这里KBC这里返回的值是0xFE，没办法判断</p> <pre><code class="language-C">/**
+    This routine checks for the data availability in output
+    buffer for a short period of time, if data is available
+    within this time, it reads and returns the data from
+    output buffer.
+
+    @param    data    - Pointer to the byte to be updated
+              msec    - Milliseconds timeout
+              ONLYOBF - Only waits for OBF if true
+
+    @retval    Returns FALSE if data is successfully updated
+               (no timeout), Returns TRUE if time-out
+
+**/
+
+BOOLEAN
+ObFullReadTimeout (
+    UINT8*      data,
+    UINT32      msec,
+    BOOLEAN     ONLYOBF )
+{
+
+    UINT8       bData;
+    UINT32      loopcount = msec &lt;&lt; 1;
+
+
+    for (; loopcount; loopcount--) {
+
+        bData = IoRead8(KBC_CMDSTS_PORT);
+
+        if (ONLYOBF &amp;&amp; (bData &amp; KBC_OBF)) {
+            *data = IoRead8(KBC_DATA_PORT);
+            return FALSE;
+        }
+
+        if ((bData &amp; (KBC_OBF|KBC_AUX_OBF)) == KBC_OBF) {
+            *data = IoRead8(KBC_DATA_PORT);
+            if (bData &amp; 0x40) {
+                return TRUE;
+            }
+            else return FALSE;  // No timeout
+        }
+
+        if ((bData &amp; (KBC_OBF|KBC_AUX_OBF)) == (KBC_OBF | KBC_AUX_OBF)){
+            return TRUE;
+        }
+
+        gBS-&gt;Stall(500);        // 0.5msec
+
+    }
+    return TRUE;    // Timeout
+}
+
+/**
+    Writes data to KBC.
+
+    @param     bCmd - Data to send to KBC
+
+    @retval    VOID
+
+**/
+
+VOID
+WriteKeyboardData (
+    UINT8   bCmd )
+{
+    EFI_STATUS              Status;
+
+    Status = IbFreeTimeout(IbFreeMaxTimeoutValue);
+    if (EFI_ERROR(Status)) {
+        return;
+    }
+    IoWrite8(KBC_DATA_PORT, bCmd);
+    Status = IbFreeTimeout(IbFreeMaxTimeoutValue);
+    if (EFI_ERROR(Status)) {
+        DEBUG((DEBUG_ERROR,"%a(): IbFreeTimeout status :%r\n", __FUNCTION__, Status));
+        return;
+    }
+}
+
+/**
+    Sends the given command to KBD, reads and returns the
+    Acknowledgment byte returned from KBD.
+
+    @param   bCmd      - Command to send to KBC
+             *Data     - Pointer to data buffer
+             Response  - Response expected
+
+    @retval    EFI_SUCCESS Data == Response
+    @retval    EFI_DEVICE_ERROR Data != Response
+
+**/
+
+EFI_STATUS
+ReadDevice (
+    UINT8   bCmd,
+    UINT8   *Data,
+    UINT8   Response )
+{
+
+    WriteKeyboardData(bCmd);
+    if (ObFullReadTimeout(Data, 40, FALSE)) return EFI_DEVICE_ERROR;
+    if (*Data == Response) return EFI_SUCCESS;
+    return EFI_DEVICE_ERROR;
+
+}
+</code></pre> <p>我也试过把Response的值改为0xFE但是结果还是找不到键盘 之前问同事，说设置以下Token</p> <pre><code class="language-SDL">TOKEN
+    Name  = "DETECT_PS2_KEYBOARD"
+    Value  = "1"
+    Help  = "1 - Perform PS2 Keyboard Detection. 0 - Do not perform PS2 Keybaord Detection."
+    TokenType = Boolean
+    TargetH = Yes
+End
+
+TOKEN
+    Name  = "DETECT_PS2_MOUSE"
+    Value  = "1"
+    Help  = "1 - Perform PS2 Mouse Detection. 0 - Do not perform PS2 Mouse Detection."
+    TokenType = Boolean
+    TargetH = Yes
+End
+
+TOKEN
+    Name  = "INSTALL_KEYBOARD_MOUSE_ALWAYS"
+    Value  = "0"
+    Help  = "1 - Install the Keyboard- SimpleTextIn, Mouse - AbsPointer Always, 0 - Install the Keyboard- SimpleTextIn, Mouse - AbsPointer only if the device is present at the time of detection."
+    TokenType = Boolean
+    TargetH = Yes
+End
+
+
+TOKEN
+    Name  = "KBC_AUTODETECT_PORTS"
+    Value  = "1"
+    Help  = "Auto detection of KB/MS using AMI KB-5.  This switch will enable/disable the connector swap of Keyboard and PS2 Mouse i.e. keyboard\can be connected to PS2 Mouse connector and vice-versa."
+    TokenType = Boolean
+    TargetH = Yes
+End
+
+
+TOKEN
+    Name  = "NCT5532D_PS2_SWAP"
+    Value  = "1"
+    Help  = "Enable/Disable PS/2 swap function"
+    TokenType = Boolean
+    TargetH = Yes
+End
+</code></pre> <p>然后就是需要把<code class="language-plaintext highlighter-rouge">NCT5532D_PS2_SWAP</code>的位置设置到PEI阶段 <img src="/assets/img/notes/4e5dfc44e433a862bf76.png" alt="Pasted image 20241129140436.png" loading="lazy"></p> <pre><code class="language-C">SIO_DEVICE_INIT_DATA NCT5532DPeiInitTable[]={
+    // -----------------------------
+    //|  Addr | DataMask  | DataValue |
+    // -----------------------------
+
+    //---------------------------------------------------------------------
+    // Enter Configuration Mode.
+    //---------------------------------------------------------------------
+    {NCT5532D_CONFIG_INDEX, 0x00, NCT5532D_CONFIG_MODE_ENTER_VALUE},
+    {NCT5532D_CONFIG_INDEX, 0x00, NCT5532D_CONFIG_MODE_ENTER_VALUE},
+
+    //YDebug-Start
+    {NCT5532D_CONFIG_INDEX, 0x00, NCT5532D_LDN_SEL_REGISTER},
+    {NCT5532D_CONFIG_DATA,0x00, NCT5532D_LDN_ACPI}, //Select ACPI
+    //OEM_TODO: Base on OEM board.
+    {NCT5532D_CONFIG_INDEX,0x00, 0xE0}, //CR E0
+    {NCT5532D_CONFIG_DATA,0x00, (NCT5532D_PS2_SWAP&lt;&lt;2)}, //Enable keyboard and mouse swap
+    //YDebug-End
+    .
+    .
+    .
+</code></pre> <p>其中只有<code class="language-plaintext highlighter-rouge">NCT5532D_PS2_SWAP</code>打开了，<code class="language-plaintext highlighter-rouge">INSTALL_KEYBOARD_MOUSE_ALWAYS</code>关掉，其他的Token之前就打开了。 ==设置之后键盘确实生效了，但是鼠标却失效了== 😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯😯 看来是<code class="language-plaintext highlighter-rouge">NCT5532D_PS2_SWAP</code>这个Token对PS2接口有影响，但只是切换PS2二合一接口接的是鼠标还是键盘 在重复试了几次之后发现，当<code class="language-plaintext highlighter-rouge">NCT5532D_PS2_SWAP</code>为0时，PS2二合一接口可接键盘，反之可接鼠标。 并且<code class="language-plaintext highlighter-rouge">NCT5532D_PS2_SWAP</code>只有在KBC initial之前配置才会生效 那么问题点找到了，下一步开始设计解决方案</p> <ol> <li> <p><strong>UEFI 启动</strong>:</p> <ul> <li>进入 PEI 阶段。</li> </ul> </li> <li> <p><strong>PEI 阶段</strong>:</p> <ul> <li>执行 <code class="language-plaintext highlighter-rouge">Super IO PEIM</code>。</li> <li>调用 <code class="language-plaintext highlighter-rouge">NCT5532DPeiInitEntryPoint</code> 函数。</li> <li>初始化 LPC 设备解码。</li> <li>读取和设置 PS2 ID。</li> <li> <strong>配置 ACPI 设备</strong>: <ul> <li>读取 ACPI 设备 0xE0 寄存器。</li> <li>根据 <code class="language-plaintext highlighter-rouge">IsMouse</code> 设置 ACPI 0xE0 寄存器的 bit2 (Keyboard/Mouse swap enable)。</li> <li>写入 0xE0 寄存器。</li> </ul> </li> <li>编程 RT 寄存器表。</li> </ul> </li> <li> <p><strong>DXE 阶段</strong>:</p> <ul> <li>加载 <code class="language-plaintext highlighter-rouge">PS2Ctl UEFI Driver</code>。</li> <li>调用 <code class="language-plaintext highlighter-rouge">PS2CtlStart</code> 函数。</li> <li>调用 <code class="language-plaintext highlighter-rouge">GetKeyBoardOrMouseVersion</code> 函数。</li> <li>检查是否已检测到键盘和鼠标。 <ul> <li>如果已检测到，返回。</li> <li>如果未检测到，初始化 PS/2 控制器。 <ul> <li>检查控制器状态。 <ul> <li>如果状态为 0x01，重置控制器并返回。</li> <li>如果状态不为 0x01，读取键盘 ID。 <ul> <li>发送命令并读取应答。</li> <li>再次读取应答。</li> <li>写入版本信息。</li> <li>延迟 1 秒。</li> <li>重启系统，重新进入 PEI 阶段</li> </ul> </li> </ul> </li> </ul> </li> </ul> </li> </ul> </li> </ol> <hr> <pre><code class="language-mermaid">
+graph TD
+
+    A[UEFI 启动] --&gt; B[PEI 阶段]
+
+    B --&gt; C[Super IO PEIM]
+
+    C --&gt; D[调用 NCT5532DPeiInitEntryPoint]
+
+    D --&gt; E[初始化 LPC 设备解码]
+
+    E --&gt; F[读取和设置 PS2 ID]
+
+    F --&gt; G[配置 ACPI 设备]
+
+    G --&gt; H[编程 RT 寄存器表]
+
+    H --&gt; I[DXE 阶段]
+
+    I --&gt; J[PS2Ctl UEFI Driver]
+
+    J --&gt; K[调用 PS2CtlStart]
+
+    K --&gt; L[调用 GetKeyBoardOrMouseVersion]
+
+    L --&gt; M{已检测到键盘和鼠标?}
+
+    M -- 是 --&gt; N[返回]
+
+    M -- 否 --&gt; O[初始化 PS/2 控制器]
+
+    O --&gt; P{控制器状态为 0x01?}
+
+    P -- 是 --&gt; Q[重置控制器并返回]
+
+    P -- 否 --&gt; R[读取键盘 ID]
+
+    R --&gt; S[发送命令并读取应答]
+
+    S --&gt; T[再次读取应答]
+
+    T --&gt; U[写入版本信息]
+
+    U --&gt; V[延迟 1 秒]
+
+    V --&gt; W[重启系统]
+
+    W --&gt; A
+
+</code></pre> <pre><code class="language-C">// &lt;AMI_PHDR_START&gt;
+//-------------------------------------------------------------------------
+//
+// Procedure: SioPeiInitEntryPoint
+//
+// Description:
+//  This function provide PEI phase SIO initialization
+//
+// Input:
+//  IN  EFI_FFS_FILE_HEADER    *FfsHeader - Logical Device's information
+//  IN  EFI_PEI_SERVICES       **PeiServices  - Read/Write PCI config space
+//
+// Output:    None
+//
+// Modified:  Nothing
+//
+// Referrals: None
+//
+// Note:
+//-------------------------------------------------------------------------
+// &lt;AMI_PHDR_END&gt;
+EFI_STATUS NCT5532DPeiInitEntryPoint(
+        IN       EFI_PEI_FILE_HANDLE  FileHandle,
+        IN CONST EFI_PEI_SERVICES     **PeiServices
+)
+{
+    UINT8 index;
+    UINT8 ACPI0xE0Value=0,NewACPI0xE0Value=0;
+    UINT8 PS2ID=0;
+    UINT8 IsMouse=BIT2;
+
+    for(index=0; index&lt;sizeof(NCT5532DPeiDecodeTable)/sizeof(IO_DECODE_DATA); index++)
+        AmiSioLibSetLpcDeviceDecoding(NULL, NCT5532DPeiDecodeTable[index].BaseAdd, NCT5532DPeiDecodeTable[index].UID, NCT5532DPeiDecodeTable[index].Type);
+
+    //YDebug_Use custome signal to set 'Keyboard/Mouse swap enable' bit_Start
+    IoWrite8(0x72,0x62);
+    PS2ID=IoRead8(0x73);
+    if (PS2ID!=0xFF)
+    {
+        IoWrite8(0x72,0x64);
+        IoWrite8(0x73,PS2ID);
+    }
+    //Check keyboard or mouse ID
+    //Keyboard is 0xAB
+    //Mouse is 0x00
+    if (PS2ID==0x00)
+    {
+        IsMouse|=BIT2;
+        IoWrite8(0x72,0x63);
+        IoWrite8(0x73,0x01);
+
+        IoWrite8(0x72,0x62);
+        IoWrite8(0x73,0xFF);
+
+    }else if (PS2ID==0xAB)
+    {
+        IsMouse=0;
+        IoWrite8(0x72,0x63);
+        IoWrite8(0x73,0x01);
+
+        IoWrite8(0x72,0x62);
+        IoWrite8(0x73,0xFF);
+    }
+
+    //Enter to congig mode
+    IoWrite8(NCT5532D_CONFIG_INDEX,NCT5532D_CONFIG_MODE_ENTER_VALUE);
+    IoWrite8(NCT5532D_CONFIG_INDEX,NCT5532D_CONFIG_MODE_ENTER_VALUE);
+    //Select ACPI device
+    IoWrite8(NCT5532D_CONFIG_INDEX,NCT5532D_LDN_SEL_REGISTER);
+    IoWrite8(NCT5532D_CONFIG_DATA,NCT5532D_LDN_ACPI);
+    //Check 0xE0 status
+    IoWrite8(NCT5532D_CONFIG_INDEX,0xE0);
+    ACPI0xE0Value=IoRead8(NCT5532D_CONFIG_INDEX);
+    ACPI0xE0Value&amp;=0x00;
+    NewACPI0xE0Value=ACPI0xE0Value|IsMouse;
+    //Write value to 0xE0
+    IoWrite8(NCT5532D_CONFIG_INDEX,0xE0);
+    IoWrite8(NCT5532D_CONFIG_DATA,NewACPI0xE0Value);
+
+    //Exit config mode
+    IoWrite8(NCT5532D_CONFIG_INDEX,NCT5532D_CONFIG_MODE_EXIT_VALUE);
+    IoWrite8(0x72,0x65);
+    IoWrite8(0x73,NewACPI0xE0Value);
+    //YDebug_Use custome signal to set 'Keyboard/Mouse swap enable' bit_End
+    ProgramRtRegisterTable(0, NCT5532DPeiInitTable, sizeof(NCT5532DPeiInitTable)/sizeof(SIO_DEVICE_INIT_DATA));
+
+    return EFI_SUCCESS;
+}
+</code></pre> <pre><code class="language-C">/**
+    PS/2 Controller Driver Start function
+    This function is a part of DriverBinfing protocol
+
+    @param    *This                - Pointer to this instance of the driver binding protocol
+              Controller           - Handle for this controller
+              *RemainingDevicePath - Pointer to last node in device path
+
+    @retval    EFI_STATUS Status of the operation
+
+**/
+
+EFI_STATUS
+EFIAPI
+PS2CtlStart (
+    EFI_DRIVER_BINDING_PROTOCOL *This,
+    EFI_HANDLE                  Controller,
+    EFI_DEVICE_PATH_PROTOCOL    *RemainingDevicePath)
+{
+    ACPI_HID_DEVICE_PATH    *acpiDP;
+    PS2DEV_TABLE            *ps2dev = 0;
+    EFI_STATUS              Status;
+    EFI_TPL                 OldTpl;
+
+    // The following code performs the basic KBC initialization
+    // It has to be executed only once, we use global variable
+    // gDriverStartCounter to control this. Also, this code is
+    // executed on a higher TPL to prevent re-entrance.
+    OldTpl = gBS-&gt;RaiseTPL(TPL_NOTIFY);
+    if (OldTpl &gt; TPL_NOTIFY) return EFI_DEVICE_ERROR;
+
+    while (!gDriverStartCounter) {
+        // Disable the Keyboard IRQ if it's enabled before
+        // Finish all the Keyboard Initialization and Re-enable the IRQ again
+        if(KbRdBeforeInstall){
+            mLegacy8259-&gt;DisableIrq( mLegacy8259, SYSTEM_KEYBOARD_IRQ );
+            gKeyboardIrqInstall=FALSE;
+        }
+        // Initialize KBC hardware
+        if ( KbcBasicAssuranceTest ) {
+            Status = KBCBatTest();      // Perform KBC Basic Assurance Test
+            if (EFI_ERROR(Status)) {
+                // Report the Error code if the BAT test failed
+                // ReportStatusCode (EFI_ERROR_CODE|EFI_ERROR_MAJOR,(EFI_PERIPHERAL_KEYBOARD | EFI_P_KEYBOARD_EC_STUCK_KEY));
+                break;
+            }
+
+            // Check for stuck keys
+            Status = IbFreeTimeout(IbFreeTimeoutValue);
+            if (EFI_ERROR(Status)) {
+                // Report the Error Code.
+                // ReportStatusCode (EFI_ERROR_CODE|EFI_ERROR_MAJOR,(EFI_PERIPHERAL_KEYBOARD | EFI_P_KEYBOARD_EC_STUCK_KEY));
+                break;
+            }
+        }
+        //YDebug_Check PS2 interface_Start
+        GetKeyBoardOrMouseVersion();
+        //YDebug_Check PS2 interface_End
+        // Swap ports if needed
+        if (AutodetectKbdMousePortsPtr!=NULL) AutodetectKbdMousePortsPtr();
+
+        gDriverStartCounter++;
+    }
+
+
+    if(!EFI_ERROR(GetPS2_DP(This, Controller, &amp;acpiDP, EFI_OPEN_PROTOCOL_BY_DRIVER)) &amp;&amp;
+            LookupPs2Hid(supportedDevices, acpiDP-&gt;HID, acpiDP-&gt;UID, &amp;ps2dev) ){
+             Status = ps2dev-&gt;start(This, Controller);
+
+            // End of critical section - restore TPL
+             gBS-&gt;RestoreTPL(OldTpl);
+
+            if(EFI_ERROR(Status)) {
+                return EFI_DEVICE_ERROR;
+            }
+
+            return EFI_SUCCESS;
+    }
+
+    // End of critical section - restore TPL
+    gBS-&gt;RestoreTPL(OldTpl);
+
+    // If control is here then something totally wrong happened:
+    // if device is not supported then Start shouldn't be called.
+    return EFI_DEVICE_ERROR;
+}
+
+//YDebug_Check PS2 interface_Start
+VOID
+GetKeyBoardOrMouseVersion()
+{
+
+    UINT8 KMVersion = 0;
+    //if keyboard and mouse both detected skip this function
+    if (Ps2KbdDetected&amp;&amp;Ps2MouseDetected)
+    {
+        return;
+    }
+    //read CMOS 0x63 to check 'Keyboard/Mouse swap enable' bit is set or not
+    IoWrite8(0x72,0x63);
+    if (IoRead8(0x73)==0x01)
+    {
+        //Clear signal
+        IoWrite8(0x72,0x63);
+        IoWrite8(0x73,0xFF);
+        return;
+    }
+
+    WriteKeyboardData(rKeyboardID); // Read KBD ID
+
+    ObFullReadTimeout(&amp;KMVersion, 1000, TRUE); // Read ACK
+
+    WriteKeyboardCommand(0xD4);
+    WriteKeyboardData(rKeyboardID);
+    ObFullReadTimeout(&amp;KMVersion, 1000, TRUE); // Read ACK
+
+    ObFullReadTimeout(&amp;KMVersion, 100, TRUE);//Read Keyboard or mouse ID
+
+    IoWrite8(0x72,0x62);
+    IoWrite8(0x73,KMVersion);
+
+    IoWrite8(0x80,0x2F);
+    gBS-&gt;Stall(1000000);
+
+    IoWrite8(0xCF9,0x06);//Reboot
+}
+//YDebug_Check PS2 interface_End
+</code></pre> </div> </article> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © Copyright 2026 Yang BIOSer. QR. Powered by <a href="https://jekyllrb.com/" target="_blank" rel="external nofollow noopener">Jekyll</a> with <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> theme. Hosted by <a href="https://pages.github.com/" target="_blank" rel="external nofollow noopener">GitHub Pages</a>. Photos from <a href="https://unsplash.com" target="_blank" rel="external nofollow noopener">Unsplash</a>. </div> </footer> <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script> <script src="/assets/js/bootstrap.bundle.min.js"></script> <script src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha256-Nn1q/fx0H7SNLZMQ5Hw5JLaTRZp0yILA/FRexe19VdI=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/imagesloaded@5.0.0/imagesloaded.pkgd.min.js" integrity="sha256-htrLFfZJ6v5udOG+3kNLINIKh2gvoKqwEhHYfTTMICc=" crossorigin="anonymous"></script> <script defer src="/assets/js/masonry.js?a0db7e5d5c70cc3252b3138b0c91dcaf" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/mermaid@10.7.0/dist/mermaid.min.js" integrity="sha256-TtLOdUA8mstPoO6sGvHIGx2ceXrrX4KgIItO06XOn8A=" crossorigin="anonymous"></script> <script defer src="/assets/js/mermaid-setup.js?38ca0a0126f7328d2d9a46bad640931f" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous"></script> <script defer src="/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer src="/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer src="/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer src="/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script async src="https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js"></script> <script async src="https://badge.dimensions.ai/badge.js"></script> <script defer type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" crossorigin="anonymous"></script> <script src="/assets/js/mathjax-setup.js?a5bb4e6a542c546dd929b24b8b236dfd"></script> <script defer src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6" crossorigin="anonymous"></script> <script defer src="/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script> <script type="module" src="/assets/js/search/ninja-keys.min.js?a3446f084dcaecc5f75aa1757d087dcf"></script> <ninja-keys hidebreadcrumbs noautoloadmdicons placeholder="Type to start searching"></ninja-keys> <script src="/assets/js/search-setup.js?6c304f7b1992d4b60f7a07956e52f04a"></script> <script src="/assets/js/search-data.js"></script> <script src="/assets/js/shortcut-key.js?6f508d74becd347268a7f822bca7309d"></script> </body> </html>

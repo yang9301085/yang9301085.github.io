@@ -1,0 +1,123 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> <meta http-equiv="X-UA-Compatible" content="IE=edge"> <title> RegisterNotification | Yang 的 BIOS 笔记 </title> <meta name="author" content="Yang BIOSer. QR"> <meta name="description" content="Setup / HII / TSE / Skia：RegisterNotification，整理自个人 BIOS / UEFI 笔记。"> <meta name="keywords" content="BIOS, UEFI, EDK2, Firmware, PCIe, Debug"> <link rel="stylesheet" href="/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04"> <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" crossorigin="anonymous"> <link defer rel="stylesheet" href="/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5"> <link defer rel="stylesheet" href="/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772"> <link defer rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap"> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-github.css?591dab5a4e56573bf4ef7fd332894c99" media="" id="highlight_theme_light"> <link rel="shortcut icon" href="data:image/svg+xml,&lt;svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22&gt;&lt;text%20y=%22.9em%22%20font-size=%2290%22&gt;%E2%9A%9B%EF%B8%8F&lt;/text&gt;&lt;/svg&gt;"> <link rel="stylesheet" href="/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e"> <link rel="canonical" href="https://yang9301085.github.io//blog/notes/registernotification-9e552407/"> <script src="/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" media="none" id="highlight_theme_dark"> <script>
+    initTheme();
+  </script> </head> <body class="fixed-top-nav sticky-bottom-footer"> <header> <nav id="navbar" class="navbar navbar-light navbar-expand-sm fixed-top" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="/"> Yang 的 BIOS 笔记 </a> <button class="navbar-toggler collapsed ml-auto" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item "> <a class="nav-link" href="/">Yang 的 BIOS 笔记 </a> </li> <li class="nav-item "> <a class="nav-link" href="/bios/">BIOS 笔记 </a> </li> <li class="nav-item active"> <a class="nav-link" href="/blog/">全部文章 </a> </li> <li class="nav-item"> <button id="search-toggle" title="Search" onclick="openSearchModal()"> <span class="nav-link">ctrl k <i class="ti ti-search"></i></span> </button> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="container mt-5" role="main"> <div class="post"> <header class="post-header"> <h1 class="post-title">RegisterNotification</h1> <p class="post-meta"> 整理于 2026-09-28 </p> <p class="post-tags"> <a href="/blog/2026"> <i class="fa-solid fa-calendar fa-sm"></i> 2026 </a>   ·   <a href="/blog/tag/bios"> <i class="fa-solid fa-hashtag fa-sm"></i> BIOS</a>   <a href="/blog/tag/uefi"> <i class="fa-solid fa-hashtag fa-sm"></i> UEFI</a>   ·   <a href="/blog/category/setup"> <i class="fa-solid fa-tag fa-sm"></i> setup</a> </p> </header> <article class="post-content"> <p class="note-context"><a href="/bios/">返回 BIOS 专题索引</a> · 整理自个人笔记，平台相关结论以原记录环境为准。</p> <div id="table-of-contents"> <ul id="toc" class="section-nav"> </ul> </div> <hr> <div id="markdown-content"> <p>RegisterNotification是AMITse中核心函数 里面包含了绝大部分有关AMITse的callback，Event，Hook <code class="language-plaintext highlighter-rouge">AmiTsePkg\EDK\MiniSetup\BootOnly\notify.c</code></p> <pre><code class="language-C">/**
+    It will create a notify event and register a notification.
+    @param VOID
+    @retval Status
+**/
+EFI_STATUS RegisterNotification( VOID )
+{
+    EFI_STATUS 	Status = EFI_UNSUPPORTED;
+    UINTN 		i;
+    EFI_EVENT 	Event, GopEvent;
+    EFI_GUID 	EfiDriverHealthProtocolGuid = EFI_DRIVER_HEALTH_PROTOCOL_GUID;
+    VOID 		*Registration = NULL, *GopRegistration = NULL;
+
+    NOTIFICATION_INFO **notify = _gNotifyList;
+
+    for ( i = 0; *notify != NULL; i++, notify++ )
+    {
+        Status = gBS-&gt;CreateEvent(
+                EFI_EVENT_NOTIFY_SIGNAL,
+                EFI_TPL_CALLBACK,
+                NotificationFunction,
+                *notify,
+                &amp;((*notify)-&gt;NotifyEvent)
+                );
+
+        if ( EFI_ERROR(Status) )
+            continue;
+
+        Status = gBS-&gt;RegisterProtocolNotify(
+                (*notify)-&gt;NotifyGuid,
+                (*notify)-&gt;NotifyEvent,
+                &amp;((*notify)-&gt;NotifyRegistration)
+                );
+            // get any of these events that have occured in the past
+        if (!EFI_ERROR (Status))
+        {
+            gBS-&gt;SignalEvent( (*notify)-&gt;NotifyEvent );
+        }
+    }
+    if (IsDriverHealthSupported ())			//Notifying the driver health protocol installation to update the drv health variable in cache
+    {
+        Status = gBS-&gt;CreateEvent(
+                EFI_EVENT_NOTIFY_SIGNAL,
+                EFI_TPL_CALLBACK,
+                _DrvHealthNotifyFunction,
+                NULL,
+                &amp;Event
+                );
+        if (!EFI_ERROR (Status))
+        {
+            Status = gBS-&gt;RegisterProtocolNotify(
+                &amp;EfiDriverHealthProtocolGuid,
+                Event,
+                &amp;Registration
+                );
+            if (!EFI_ERROR(Status))
+            {
+                gBS-&gt;SignalEvent (Event);
+            }
+        }
+    }
+
+//Validate the Gop before usage in all the possible cases and also get instance of Gop through notification
+    Status = gBS-&gt;CreateEvent(
+                EFI_EVENT_NOTIFY_SIGNAL,
+                EFI_TPL_CALLBACK,
+                _UpdateGoPNotifyFunction,
+                NULL,
+                &amp;GopEvent
+                );
+        if (!EFI_ERROR (Status))
+        {
+            Status = gBS-&gt;RegisterProtocolNotify(
+                &amp;gEfiGraphicsOutputProtocolGuid,
+                GopEvent,
+                &amp;GopRegistration
+                );
+            if (!EFI_ERROR(Status))
+            {
+                gBS-&gt;SignalEvent (GopEvent);
+            }
+        }
+    return Status;
+}
+</code></pre> <pre><code class="language-mermaid">graph TD
+    classDef startend fill:#F5EBFF,stroke:#BE8FED,stroke-width:2px;
+    classDef process fill:#E5F6FF,stroke:#73A6FF,stroke-width:2px;
+    classDef decision fill:#FFF6CC,stroke:#FFBC52,stroke-width:2px;
+
+    A([开始]):::startend --&gt; B(初始化变量):::process
+    B --&gt; C(设置 notify 指向 _gNotifyList):::process
+    C --&gt; D{i &lt; _gNotifyList 长度?}:::decision
+    D -- 是 --&gt; E(创建通知事件):::process
+    E --&gt; F{事件创建成功?}:::decision
+    F -- 否 --&gt; G(跳过当前项，i++ 并指向下一项):::process
+    G --&gt; D
+    F -- 是 --&gt; H(注册协议通知):::process
+    H --&gt; I{协议通知注册成功?}:::decision
+    I -- 是 --&gt; J(触发事件):::process
+    J --&gt; G
+    I -- 否 --&gt; G
+    D -- 否 --&gt; K{IsDriverHealthSupported?}:::decision
+    K -- 是 --&gt; L(创建驱动健康通知事件):::process
+    L --&gt; M{事件创建成功?}:::decision
+    M -- 是 --&gt; N(注册驱动健康协议通知):::process
+    N --&gt; O{协议通知注册成功?}:::decision
+    O -- 是 --&gt; P(触发驱动健康事件):::process
+    P --&gt; Q(创建 GOP 通知事件):::process
+    M -- 否 --&gt; Q
+    O -- 否 --&gt; Q
+    K -- 否 --&gt; Q
+    Q --&gt; R{事件创建成功?}:::decision
+    R -- 是 --&gt; S(注册 GOP 协议通知):::process
+    S --&gt; T{协议通知注册成功?}:::decision
+    T -- 是 --&gt; U(触发 GOP 事件):::process
+    U --&gt; V([返回 Status]):::startend
+    R -- 否 --&gt; V
+    T -- 否 --&gt; V
+</code></pre> <p>RegisterNotification通过CreateEvent注册Event，当相应的Event被触发， 就会执行NotificationFunction中对应的动作</p> </div> </article> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © Copyright 2026 Yang BIOSer. QR. Powered by <a href="https://jekyllrb.com/" target="_blank" rel="external nofollow noopener">Jekyll</a> with <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> theme. Hosted by <a href="https://pages.github.com/" target="_blank" rel="external nofollow noopener">GitHub Pages</a>. Photos from <a href="https://unsplash.com" target="_blank" rel="external nofollow noopener">Unsplash</a>. </div> </footer> <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script> <script src="/assets/js/bootstrap.bundle.min.js"></script> <script src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha256-Nn1q/fx0H7SNLZMQ5Hw5JLaTRZp0yILA/FRexe19VdI=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/imagesloaded@5.0.0/imagesloaded.pkgd.min.js" integrity="sha256-htrLFfZJ6v5udOG+3kNLINIKh2gvoKqwEhHYfTTMICc=" crossorigin="anonymous"></script> <script defer src="/assets/js/masonry.js?a0db7e5d5c70cc3252b3138b0c91dcaf" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/mermaid@10.7.0/dist/mermaid.min.js" integrity="sha256-TtLOdUA8mstPoO6sGvHIGx2ceXrrX4KgIItO06XOn8A=" crossorigin="anonymous"></script> <script defer src="/assets/js/mermaid-setup.js?38ca0a0126f7328d2d9a46bad640931f" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous"></script> <script defer src="/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer src="/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer src="/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer src="/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script async src="https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js"></script> <script async src="https://badge.dimensions.ai/badge.js"></script> <script defer type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" crossorigin="anonymous"></script> <script src="/assets/js/mathjax-setup.js?a5bb4e6a542c546dd929b24b8b236dfd"></script> <script defer src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6" crossorigin="anonymous"></script> <script defer src="/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script> <script type="module" src="/assets/js/search/ninja-keys.min.js?a3446f084dcaecc5f75aa1757d087dcf"></script> <ninja-keys hidebreadcrumbs noautoloadmdicons placeholder="Type to start searching"></ninja-keys> <script src="/assets/js/search-setup.js?6c304f7b1992d4b60f7a07956e52f04a"></script> <script src="/assets/js/search-data.js"></script> <script src="/assets/js/shortcut-key.js?6f508d74becd347268a7f822bca7309d"></script> </body> </html>

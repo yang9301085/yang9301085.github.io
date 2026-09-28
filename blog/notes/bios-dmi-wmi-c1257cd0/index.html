@@ -1,0 +1,196 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> <meta http-equiv="X-UA-Compatible" content="IE=edge"> <title> 如何在操作系统下获得BIOS和硬件信息（一）：什么是DMI和WMI？ | Yang 的 BIOS 笔记 </title> <meta name="author" content="Yang BIOSer. QR"> <meta name="description" content="UEFI 启动与基础：如何在操作系统下获得BIOS和硬件信息（一）：什么是DMI和WMI？，整理自个人 BIOS / UEFI 笔记。"> <meta name="keywords" content="BIOS, UEFI, EDK2, Firmware, PCIe, Debug"> <link rel="stylesheet" href="/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04"> <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" crossorigin="anonymous"> <link defer rel="stylesheet" href="/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5"> <link defer rel="stylesheet" href="/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772"> <link defer rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap"> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-github.css?591dab5a4e56573bf4ef7fd332894c99" media="" id="highlight_theme_light"> <link rel="shortcut icon" href="data:image/svg+xml,&lt;svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22&gt;&lt;text%20y=%22.9em%22%20font-size=%2290%22&gt;%E2%9A%9B%EF%B8%8F&lt;/text&gt;&lt;/svg&gt;"> <link rel="stylesheet" href="/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e"> <link rel="canonical" href="https://yang9301085.github.io//blog/notes/bios-dmi-wmi-c1257cd0/"> <script src="/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" media="none" id="highlight_theme_dark"> <script>
+    initTheme();
+  </script> </head> <body class="fixed-top-nav sticky-bottom-footer"> <header> <nav id="navbar" class="navbar navbar-light navbar-expand-sm fixed-top" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="/"> Yang 的 BIOS 笔记 </a> <button class="navbar-toggler collapsed ml-auto" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item "> <a class="nav-link" href="/">Yang 的 BIOS 笔记 </a> </li> <li class="nav-item "> <a class="nav-link" href="/bios/">BIOS 笔记 </a> </li> <li class="nav-item active"> <a class="nav-link" href="/blog/">全部文章 </a> </li> <li class="nav-item"> <button id="search-toggle" title="Search" onclick="openSearchModal()"> <span class="nav-link">ctrl k <i class="ti ti-search"></i></span> </button> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="container mt-5" role="main"> <div class="post"> <header class="post-header"> <h1 class="post-title">如何在操作系统下获得BIOS和硬件信息（一）：什么是DMI和WMI？</h1> <p class="post-meta"> 整理于 2026-09-28 </p> <p class="post-tags"> <a href="/blog/2026"> <i class="fa-solid fa-calendar fa-sm"></i> 2026 </a>   ·   <a href="/blog/tag/bios"> <i class="fa-solid fa-hashtag fa-sm"></i> BIOS</a>   <a href="/blog/tag/uefi"> <i class="fa-solid fa-hashtag fa-sm"></i> UEFI</a>   ·   <a href="/blog/category/uefi"> <i class="fa-solid fa-tag fa-sm"></i> uefi</a> </p> </header> <article class="post-content"> <p class="note-context"><a href="/bios/">返回 BIOS 专题索引</a> · 整理自个人笔记，平台相关结论以原记录环境为准。</p> <div id="table-of-contents"> <ul id="toc" class="section-nav"> <li class="toc-entry toc-h2"><a href="#acpi">ACPI</a></li> </ul> </div> <hr> <div id="markdown-content"> <p>我常用hwinfo64来查看电脑硬件状态：</p> <p><img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthNFjqHicFevYiaUEtvloRgrnKIb4IzMag74v6RUOqOSvFJEibXFE9MgQwdA/640?wx_fmt=png&amp;from=appmsg&amp;wxfrom=13&amp;tp=wxpic" alt="图片"></p> <p>在里面，我们能看到硬件的各种信息：主板厂家、BIOS厂家、内存的品牌和在位信息等等，以及各种Sensor的当前值，如各个CPU内核的温度、风扇的转速、GPU的温度和HDD的SMART内容等等。各位同学有没有好奇，这些软件是怎么做到的？</p> <p><strong>一部分信息当然来源于BIOS的输出：SMBIOS和ACPI，还有部分直接读取硬件寄存器（CPU、芯片组、SuperIO、EC），以及借助厂家（如GPU厂家）提供的辅助lib</strong>。本系列就来深入讲讲其中的原理，并借助两套开源代码仓库，结合实际，让你也有能力写出类似的程序，如下面这个：</p> <p><img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthNkmJ8wG43oaPHGx7usDmgGteHW98QRtT7j7VzlMnJv8euuBea4jiaHzQ/640?wx_fmt=png&amp;from=appmsg&amp;wxfrom=13&amp;tp=wxpic" alt="图片"></p> <p>本系列分两个文章：</p> <ul> <li> <strong>本文</strong>，主要介绍在Windows和Linux下，读取SMBIOS和ACPI的方法。并结合开源DumpSMBIOS【1】 源码，深入Windows获取SMBIOS信息的两种方法。</li> <li> <strong>深入篇</strong>，结合开源openhardwaremonitor【2】 源码，深入介绍它获得硬件信息的三种方式，以及为什么这么做，而不是采用其他方法。 首先，我们从基础概念说起。</li> </ul> <h2 id="acpi" style="color:#0066CC">ACPI</h2> <p><img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthN3UFLelxrAo8OkSTrqw3c0Tj8Lz8QYx8gIGhdtMZvq5yxcEZs6Ahqnw/640?wx_fmt=png&amp;from=appmsg&amp;tp=wxpic&amp;wxfrom=5&amp;wx_lazy=1&amp;wx_co=1" alt="图片"></p> <p>我已经不止一次得介绍过ACPI：</p> <p><a href="https://mp.weixin.qq.com/s?__biz=MzI2NDYwMDAxOQ==&amp;mid=2247484333&amp;idx=5&amp;sn=66269e4acfd63d130c8e78d02b60a3d9&amp;scene=21#wechat_redirect" rel="external nofollow noopener" target="_blank">ACPI与UEFI</a></p> <p><a href="https://mp.weixin.qq.com/s?__biz=MzI2NDYwMDAxOQ==&amp;mid=2247486033&amp;idx=1&amp;sn=057ac7e9a6a2386263c8d117ed0697c5&amp;scene=21#wechat_redirect" rel="external nofollow noopener" target="_blank">为什么ARM Server要用ACPI？ACPI vs DeviceTree</a></p> <p>这里提供一个省流版总结：ACPI是Intel、Microsoft、东芝等公司联合开发的一种开放标准，它的核心目标是优化电源管理，同时提供更灵活的设备配置方式。ACPI的引入，使得操作系统可以直接控制硬件的电源状态，而不需要依赖BIOS的预设逻辑，从而提升了计算机的节能能力和管理效率。ACPI主要通过一套标准的数据结构和方法，允许操作系统与固件（BIOS或UEFI）进行交互，其中最关键的部分包括：</p> <p><strong>ACPI静态表</strong>：BIOS在系统启动时会将ACPI表加载到内存中，操作系统启动后会读取这些表以了解硬件拓扑和电源管理能力。常见的ACPI表包括：</p> <ul> <li>DSDT（Differentiated System Description Table）：包含ACPI设备树和方法定义，描述了如何操作和管理硬件。</li> <li>FADT（Fixed ACPI Description Table）：提供固定的系统信息，例如电源管理的基本能力。</li> <li>MADT（Multiple APIC Description Table）：描述CPU的中断控制器配置，影响多核处理器的中断管理。</li> </ul> <p><strong>ACPI资源树与动态方法</strong>：采用ASL（ACPI Source Language）语言编写的控制方法，会被编译成为AML（ACPI Machine Language）特殊的字节码。方法如：</p> <ul> <li>_PTS（Prepare To Sleep）：当操作系统进入睡眠状态前调用。</li> <li>_WAK（Wake）：在计算机从睡眠模式恢复时调用。</li> <li>_Qxx（Query）：用于事件查询，如热键触发等。</li> </ul> <p><strong>SMBIOS和DMI</strong></p> <p><img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthN3UFLelxrAo8OkSTrqw3c0Tj8Lz8QYx8gIGhdtMZvq5yxcEZs6Ahqnw/640?wx_fmt=png&amp;from=appmsg&amp;tp=wxpic&amp;wxfrom=5&amp;wx_lazy=1&amp;wx_co=1" alt="图片"></p> <p><strong>SMBIOS（System Management BIOS）</strong>规范定义了一系列静态表，它由BIOS生成，包含电脑的各种硬件信息，目的是操作系统就无需测硬件来发现计算机中存在哪些设备。</p> <p>SMBIOS很容易和DMI搞混，因为SMBIOS最早的名字叫做<strong>DMIBIOS（Desktop Management BIOS）</strong>，因为它是DMI（Desktop Management Interface）的数据基础（什么是DMI后面我们讲）。1996年当时的BIOS厂家带头大哥Phoenix（现在已经落后，它的故事在这里：<a href="https://mp.weixin.qq.com/s?__biz=MzI2NDYwMDAxOQ==&amp;mid=2247484404&amp;idx=1&amp;sn=4bc441e8419d7e6e871b2a5f055e4435&amp;scene=21#wechat_redirect" rel="external nofollow noopener" target="_blank">风雨40载：BIOS的过去和国产BIOS的诞生</a>）提出DMIBIOS，发布了几版更新后，由老牌非营利组织Distributed Management Task Force(DMTF)接管，改名叫做SMBIOS并维护至今。最新的是SMBIOS 3.8.0 【3】。基本上就是根据硬件发展，做一些兼容性扩充。</p> <p>DMI，实际上是SMBIOS的一层软件抽象。由操作系统，根据SMBIOS生成的一些列数据结构。它和SMBIOS是分开的，SMBIOS由BIOS生成并更新，启动到操作系统后就不变了。而DMI，是运行时，由OS生成并提供其他组件和上层使用，有自己的标准：DMI 【4】。DMI最新的标准是2.0.1【5】 ，它已经EOL（End of Life）,但还有大量的应用还在用它，如dmidecode。</p> <p><strong>ACPI和SMBIOS</strong></p> <p><img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthN3UFLelxrAo8OkSTrqw3c0Tj8Lz8QYx8gIGhdtMZvq5yxcEZs6Ahqnw/640?wx_fmt=png&amp;from=appmsg&amp;tp=wxpic&amp;wxfrom=5&amp;wx_lazy=1&amp;wx_co=1" alt="图片"></p> <p>有同学可能要问了，为什么BIOS既要给操作系统输出SMBIOS，还要输出ACPI？两个都是硬件抽象，是不是重复了？</p> <p>是有点信息重复。我的理解是：除了历史原因，两个表的侧重点不同：</p> <ul> <li>SMBIOS重点在于主板/平台的信息汇报，信息流是单向的，如CPU、内存、PCIe、槽位、主板上料件等等信息，甚至可以和BMC、EC、AMT等结合做资产管理；</li> <li>ACPI重点在于控制，数据流和控制流是双向的。ACPI的前期重点在于CPU和外设等的电源、功耗和性能汇报和控制，后期加了越来越多的东西，但本质还是控制，报告的信息如设备树，也是为了让OS知道有哪些设备，之间是什么关系，有什么控制方式等。ACPI有很多表，还有很多Method等，Method是控制流自不待言，甚至静态表里面也暴露了很多寄存器或者MMIO，用于操作系统来进行控制。</li> </ul> <p>OS实际上是通过ACPI和BIOS来交互的，而不是像SMBIOS那样一过性的单向汇报。但如果想要在OS起来后，再通过动态修改ACPI所在的内存来动态修改ACPI还是不可行的，因为OS会把这块内存的内容copy到自己的一块私有内存中，原来的就不用了。要修改ACPI，我们业内叫做Patch ACPI Table，还是应该在BIOS ReadyToBoot之前，修改对应内存。</p> <p><strong>程序代码</strong></p> <p><img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthN3UFLelxrAo8OkSTrqw3c0Tj8Lz8QYx8gIGhdtMZvq5yxcEZs6Ahqnw/640?wx_fmt=png&amp;from=appmsg&amp;tp=wxpic&amp;wxfrom=5&amp;wx_lazy=1&amp;wx_co=1" alt="图片"></p> <p>Enough原理，是时候说些代码了。我们先看看如何访问SMBIOS数据。</p> <p>1</p> <p>SMBIOS</p> <p>在 Linux 中可以通过/sys/firmware/dmi目录或者使用dmidecode 命令，当然命令行最简单：</p> <p>sudo dmidecode –type bios # 读取BIOS信息</p> <p>sudo dmidecode –type 28   # 读取 DMI/SMBIOS 温度传感器信息</p> <p>sudo dmidecode –type 27   # 读取 DMI/SMBIOS 风扇信息</p> <p>因为SMBIOS按照Spec，应该被放置在0xF0000-0xFFFFF之间，我们可以用程序来直接搜索得到：</p> <p><img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthNicia3Y9oocjHoTVv9AhuibUHPlY7j4kIHCM8UTVBDVDFFBboQPeP9qO1A/640?wx_fmt=png&amp;from=appmsg&amp;tp=wxpic&amp;wxfrom=5&amp;wx_lazy=1&amp;wx_co=1" alt="图片"></p> <p>其实就是在指定内存空间寻找“<em>SM</em>”这个关键字拉。这些是Linux代码，在Windows下，我们可以看看DumpSMBIOS 是怎么做的。它是个VS Studio代码仓库，比较老，我们可以用VSS打开它或者直接用VS Code打开。关键语句在DumpSMBIOS-Legacy模块里，FindSMBIOS函数中：</p> <p><img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthNZpx6ibalTYMZa7qQRKPeK5qqCXj3N9RR4I9kYDqHOu00jYwltzJJnRA/640?wx_fmt=png&amp;from=appmsg&amp;tp=wxpic&amp;wxfrom=5&amp;wx_lazy=1&amp;wx_co=1" alt="图片"></p> <p>注意，它不仅仅寻找了SMBIOS的关键字<em>SM</em>，还寻找了DMIBIOS的关键字<em>DMI</em>。</p> <p>搜索的办法太土了，有没有更方便的方法呢？当然有了，其实Windows已经提供了接口：GetSystemFirmwareTable 。它不仅能寻找SMBIOS，还可以寻找ACPI，还可以寻找ACPI：</p> <p><img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthNia7za5REjaFK9cQ5dFLs7VhCwlibCegntcJFDa8mSt7bDAsfpd4u8k1Q/640?wx_fmt=png&amp;from=appmsg&amp;tp=wxpic&amp;wxfrom=5&amp;wx_lazy=1&amp;wx_co=1" alt="图片"></p> <p>如下面程序，调用 GetSystemFirmwareTable() 读取 RSMB（Raw SMBIOS）后，通过解析 SMBIOS_TABLE_ENTRY_POINT 和 SMBIOS_TABLE_HEADER 结构体，提取 Type 17（Memory Device） 结构中的内存信息，来获得内存在位信息：</p> <pre><code class="language-C">#pragma pack(1) // 保证结构体按 1 字节对齐
+// SMBIOS 表头结构
+struct SMBIOSHeader {
+    BYTE Type;
+    BYTE Length;
+    WORD Handle;
+};
+
+// SMBIOS Type 17（内存设备）结构
+struct MemoryDevice {
+    SMBIOSHeader Header;
+    WORD PhysicalMemoryArrayHandle;
+    WORD MemoryErrorInformationHandle;
+    WORD TotalWidth;
+    WORD DataWidth;
+    WORD Size;
+    BYTE FormFactor;
+    BYTE DeviceSet;
+    BYTE DeviceLocator;
+    BYTE BankLocator;
+    BYTE MemoryType;
+    WORD Speed;
+};
+
+// 获取 SMBIOS 表
+std::vectorGetSMBIOSData() {
+    DWORD size = GetSystemFirmwareTable('RSMB', 0, NULL, 0);
+    if (size == 0) {
+        std::cerr &lt;&lt; "无法获取 SMBIOS 大小" &lt;&lt; std::endl;
+        return {};
+    }
+
+    std::vectorbuffer(size);
+    if (GetSystemFirmwareTable('RSMB', 0, buffer.data(), size) == 0) {
+        std::cerr &lt;&lt; "无法获取 SMBIOS 数据" &lt;&lt; std::endl;
+        return {};
+    }
+    return buffer;
+}
+
+// 解析 SMBIOS 表，获取内存设备信息
+void ParseSMBIOS(const std::vector&amp; smbiosData) {
+    if (smbiosData.empty()) {
+        std::cerr &lt;&lt; "SMBIOS 数据为空" &lt;&lt; std::endl;
+        return;
+    }
+
+    BYTE* data = (BYTE*)smbiosData.data();
+    DWORD length = smbiosData.size();
+    DWORD offset = 8; // 跳过 SMBIOS 入口点结构
+
+    int memoryCount = 0;
+    while (offset &lt; length) {
+        SMBIOSHeader* header = (SMBIOSHeader*)(data + offset);
+        if (header-&gt;Type == 127) break; // Type 127 标记 SMBIOS 结束
+        if (header-&gt;Type == 17) { // Type 17 = Memory Device
+            MemoryDevice* mem = (MemoryDevice*)header;
+            if (mem-&gt;Size != 0xFFFF) { // 0xFFFF 表示未安装
+                memoryCount++;
+                std::cout &lt;&lt; "内存条 #" &lt;&lt; memoryCount &lt;&lt; ":" &lt;&lt; std::endl;
+                std::cout &lt;&lt; "  插槽: " &lt;&lt; (int)mem-&gt;DeviceLocator &lt;&lt; std::endl;
+                std::cout &lt;&lt; "  物理 Bank: " &lt;&lt; (int)mem-&gt;BankLocator &lt;&lt; std::endl;
+                std::cout &lt;&lt; "  大小: " &lt;&lt; ((mem-&gt;Size &amp; 0x8000) ? (mem-&gt;Size &amp; 0x7FFF) * 1024 : mem-&gt;Size) &lt;&lt; " MB" &lt;&lt; std::endl;
+                std::cout &lt;&lt; "  速度: " &lt;&lt; mem-&gt;Speed &lt;&lt; " MHz" &lt;&lt; std::endl;
+            }
+        }
+
+        // 跳过当前表 + 结构体字符串区域
+        BYTE* p = data + offset + header-&gt;Length;
+        while (*p != 0 || *(p + 1) != 0) p++; // 跳过字符串部分
+        offset = (p + 2) - data;
+    }
+
+    std::cout &lt;&lt; "总共检测到 " &lt;&lt; memoryCount &lt;&lt; " 根内存条" &lt;&lt; std::endl;
+}
+
+int main() {
+    std::vectorsmbiosData = GetSMBIOSData();
+    ParseSMBIOS(smbiosData);
+    return 0;
+}
+</code></pre> <p>输出为：</p> <pre><code class="language-Text">内存条 #1:
+  插槽: 0
+  物理 Bank: 0
+  大小: 8192 MB
+  速度: 3200 MHz
+
+内存条 #2:
+  插槽: 2
+  物理 Bank: 1
+  大小: 8192 MB
+  速度: 3200 MHz
+
+总共检测到 2 根内存条
+</code></pre> <p>DumpSMBIOS 是怎么做的呢？它在DumpSMBIOS模块的DumpSMBIOS.cpp里： <img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthNHTPuzrakbEagQvxzqpEpJjTgsOXa1AchMat8iaSEzHFjGDoaQ5VqtMw/640?wx_fmt=png&amp;from=appmsg&amp;tp=wxpic&amp;wxfrom=5&amp;wx_lazy=1&amp;wx_co=1" alt="图片"></p> <p>输出结果如下：</p> <p><img src="https://mmbiz.qpic.cn/sz_mmbiz_png/b1VnSPAicLiaL9GA3fBH5G9TPk2ibIdCthN2Ld4o75V7zsjs3qKymk8tSKrQM4CBhvYpGtcZUGq3dYnejMGpxw8Gg/640?wx_fmt=png&amp;from=appmsg&amp;tp=wxpic&amp;wxfrom=5&amp;wx_lazy=1&amp;wx_co=1" alt="图片"></p> <p><em>节选，不全</em></p> <p>ACPI</p> <p>在 Linux 下可以读取 /sys/firmware/acpi/tables/ 目录获取 ACPI表，非常简单，这里就跳过了。在Windows下，推荐WMI（Windows Management Instrumentation）来访问ACPI。WMI (Windows Management Instrumentation) 是 Windows 系统中一个重要的管理基础结构，用于访问系统管理信息。在硬件监控中，它是一个非常有用的工具。</p> <p>WMI的接口是COM接口，没用过的同学可能不太熟悉。COM接口实际上是Windows的底层结构，很多功能实际上都是基于COM接口，我们以后再讲。先说今天的主题，如我们在ACPI中定义了一个温区，用_TMP返回一个固定的温度（Demo）：</p> <pre><code class="language-C">Device (THRM)
+{
+    Name (_HID, "ACPI0007")  // ACPI 设备 ID
+    Name (_TMP, Method (0, NotSerialized)
+    {
+        Return (0x2D) // 返回假定的温度值 45°C
+    })
+}
+//我们可以用WMI来访问它：
+#pragma comment(lib, "wbemuuid.lib")
+double GetCPUTemperature() {
+    HRESULT hres;
+    // 初始化 COM
+    hres = CoInitializeEx(0, COINIT_MULTITHREADED);
+    if (FAILED(hres)) {
+        std::cerr &lt;&lt; "COM 初始化失败: " &lt;&lt; std::hex &lt;&lt; hres &lt;&lt; std::endl;
+        return -1;
+    }
+
+    // 初始化安全性
+    hres = CoInitializeSecurity(NULL, -1, NULL, NULL, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE, NULL);
+    if (FAILED(hres)) {
+        std::cerr &lt;&lt; "COM 安全初始化失败: " &lt;&lt; std::hex &lt;&lt; hres &lt;&lt; std::endl;
+        CoUninitialize();
+        return -1;
+    }
+
+    IWbemLocator *pLoc = NULL;
+    hres = CoCreateInstance(CLSID_WbemLocator, 0, CLSCTX_INPROC_SERVER, IID_IWbemLocator, (LPVOID *)&amp;pLoc);
+    if (FAILED(hres)) {
+        std::cerr &lt;&lt; "创建 WMI 连接失败: " &lt;&lt; std::hex &lt;&lt; hres &lt;&lt; std::endl;
+        CoUninitialize();
+        return -1;
+    }
+
+    IWbemServices *pSvc = NULL;
+    hres = pLoc-&gt;ConnectServer(BSTR(L"ROOT\\WMI"), NULL, NULL, 0, NULL, 0, 0, &amp;pSvc);
+    if (FAILED(hres)) {
+        std::cerr &lt;&lt; "连接 WMI 失败: " &lt;&lt; std::hex &lt;&lt; hres &lt;&lt; std::endl;
+        pLoc-&gt;Release();
+        CoUninitialize();
+        return -1;
+    }
+
+    hres = CoSetProxyBlanket(pSvc, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, NULL, RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE);
+    if (FAILED(hres)) {
+        std::cerr &lt;&lt; "设置 WMI 权限失败: " &lt;&lt; std::hex &lt;&lt; hres &lt;&lt; std::endl;
+        pSvc-&gt;Release();
+        pLoc-&gt;Release();
+        CoUninitialize();
+        return -1;
+    }
+
+    IEnumWbemClassObject* pEnumerator = NULL;
+    hres = pSvc-&gt;ExecQuery(BSTR(L"WQL"), BSTR(L"SELECT * FROM MSAcpi_ThermalZoneTemperature"), WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, NULL, &amp;pEnumerator);
+    if (FAILED(hres)) {
+        std::cerr &lt;&lt; "查询温度失败: " &lt;&lt; std::hex &lt;&lt; hres &lt;&lt; std::endl;
+        pSvc-&gt;Release();
+        pLoc-&gt;Release();
+        CoUninitialize();
+        return -1;
+    }
+
+    IWbemClassObject *pclsObj = NULL;
+    ULONG uReturn = 0;
+    double temperature = -1;
+
+    while (pEnumerator) {
+        HRESULT hr = pEnumerator-&gt;Next(WBEM_INFINITE, 1, &amp;pclsObj, &amp;uReturn);
+        if (uReturn == 0) break;
+        VARIANT vtProp;
+        hr = pclsObj-&gt;Get(L"CurrentTemperature", 0, &amp;vtProp, 0, 0);
+        if (SUCCEEDED(hr)) {
+            temperature = (vtProp.uintVal - 2732) / 10.0; // 转换为摄氏度
+            VariantClear(&amp;vtProp);
+        }
+        pclsObj-&gt;Release();
+    }
+
+    pSvc-&gt;Release();
+    pLoc-&gt;Release();
+    pEnumerator-&gt;Release();
+    CoUninitialize();
+   
+    return temperature;
+}
+
+int main() {
+    double temp = GetCPUTemperature();
+    if (temp &gt;= 0) {
+        std::cout &lt;&lt; "CPU 温度: " &lt;&lt; temp &lt;&lt; "°C" &lt;&lt; std::endl;
+    } else {
+        std::cout &lt;&lt; "无法获取 CPU 温度" &lt;&lt; std::endl;
+    }
+
+    return 0;
+}
+</code></pre> <p>常用 WMI 命名空间有：</p> <ul> <li>root\CIMV2 ：最常用，包含大多数系统信息</li> <li>root\WMI ：包含温度、电源等传感器数据</li> <li>root\Hardware ：硬件相关信息</li> </ul> <p>其实程序非常简单，先用COM接口发现Locator，用Locator连接WMI service，然后就可以以类似SQL语言来查询感兴趣的东西了。 除了温度，我们也可以来查询风扇转速 <img src="/assets/img/notes/a1e9a58a6767bd78a877.png" alt="c434f585d88b6d0c0d1c17e364607118.png" loading="lazy"> 注意这次是Locate “root\CIMV2”下的服务。用“root\CIMV2”还可以访问SMBIOS提供的内存在位信息，非常强大： <img src="/assets/img/notes/e85db9300ce40259a01b.png" alt="574d58c87c6e962aa6d3597039e8450d.png" loading="lazy"> 输出结果为：</p> <p><img src="/assets/img/notes/2c63a83863c7fcd48a67.png" alt="069b8c8f312085b3c5630b329c37f73c.png" loading="lazy"> 还有没有别的方法？当然还有，还可以使用我们下文会讲到的OpenHardwareMonitor，它由一个Lib和一个界面组成。我们可以直接用它里面的函数来完成很多操作。 <img src="/assets/img/notes/910bf6ae3f1f12db77f3.png" alt="06ff89a60dc4c90bf60a1ad6b5e365de.png" loading="lazy"></p> </div> </article> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © Copyright 2026 Yang BIOSer. QR. Powered by <a href="https://jekyllrb.com/" target="_blank" rel="external nofollow noopener">Jekyll</a> with <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> theme. Hosted by <a href="https://pages.github.com/" target="_blank" rel="external nofollow noopener">GitHub Pages</a>. Photos from <a href="https://unsplash.com" target="_blank" rel="external nofollow noopener">Unsplash</a>. </div> </footer> <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script> <script src="/assets/js/bootstrap.bundle.min.js"></script> <script src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha256-Nn1q/fx0H7SNLZMQ5Hw5JLaTRZp0yILA/FRexe19VdI=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/imagesloaded@5.0.0/imagesloaded.pkgd.min.js" integrity="sha256-htrLFfZJ6v5udOG+3kNLINIKh2gvoKqwEhHYfTTMICc=" crossorigin="anonymous"></script> <script defer src="/assets/js/masonry.js?a0db7e5d5c70cc3252b3138b0c91dcaf" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous"></script> <script defer src="/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer src="/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer src="/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer src="/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script async src="https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js"></script> <script async src="https://badge.dimensions.ai/badge.js"></script> <script defer type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" crossorigin="anonymous"></script> <script src="/assets/js/mathjax-setup.js?a5bb4e6a542c546dd929b24b8b236dfd"></script> <script defer src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6" crossorigin="anonymous"></script> <script defer src="/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script> <script type="module" src="/assets/js/search/ninja-keys.min.js?a3446f084dcaecc5f75aa1757d087dcf"></script> <ninja-keys hidebreadcrumbs noautoloadmdicons placeholder="Type to start searching"></ninja-keys> <script src="/assets/js/search-setup.js?6c304f7b1992d4b60f7a07956e52f04a"></script> <script src="/assets/js/search-data.js"></script> <script src="/assets/js/shortcut-key.js?6f508d74becd347268a7f822bca7309d"></script> </body> </html>

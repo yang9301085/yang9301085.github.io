@@ -1,0 +1,343 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> <meta http-equiv="X-UA-Compatible" content="IE=edge"> <title> Intel 8042 | Yang 的 BIOS 笔记 </title> <meta name="author" content="Yang BIOSer. QR"> <meta name="description" content="板级 IO 与电源：Intel 8042，整理自个人 BIOS / UEFI 笔记。"> <meta name="keywords" content="BIOS, UEFI, EDK2, Firmware, PCIe, Debug"> <link rel="stylesheet" href="/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04"> <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" crossorigin="anonymous"> <link defer rel="stylesheet" href="/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5"> <link defer rel="stylesheet" href="/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772"> <link defer rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap"> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-github.css?591dab5a4e56573bf4ef7fd332894c99" media="" id="highlight_theme_light"> <link rel="shortcut icon" href="data:image/svg+xml,&lt;svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22&gt;&lt;text%20y=%22.9em%22%20font-size=%2290%22&gt;%E2%9A%9B%EF%B8%8F&lt;/text&gt;&lt;/svg&gt;"> <link rel="stylesheet" href="/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e"> <link rel="canonical" href="https://yang9301085.github.io//blog/notes/intel-8042-36b0f385/"> <script src="/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" media="none" id="highlight_theme_dark"> <script>
+    initTheme();
+  </script> </head> <body class="fixed-top-nav sticky-bottom-footer"> <header> <nav id="navbar" class="navbar navbar-light navbar-expand-sm fixed-top" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="/"> Yang 的 BIOS 笔记 </a> <button class="navbar-toggler collapsed ml-auto" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item "> <a class="nav-link" href="/">Yang 的 BIOS 笔记 </a> </li> <li class="nav-item "> <a class="nav-link" href="/bios/">BIOS 笔记 </a> </li> <li class="nav-item active"> <a class="nav-link" href="/blog/">全部文章 </a> </li> <li class="nav-item"> <button id="search-toggle" title="Search" onclick="openSearchModal()"> <span class="nav-link">ctrl k <i class="ti ti-search"></i></span> </button> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="container mt-5" role="main"> <div class="post"> <header class="post-header"> <h1 class="post-title">Intel 8042</h1> <p class="post-meta"> 整理于 2026-09-28 </p> <p class="post-tags"> <a href="/blog/2026"> <i class="fa-solid fa-calendar fa-sm"></i> 2026 </a>   ·   <a href="/blog/tag/bios"> <i class="fa-solid fa-hashtag fa-sm"></i> BIOS</a>   <a href="/blog/tag/uefi"> <i class="fa-solid fa-hashtag fa-sm"></i> UEFI</a>   ·   <a href="/blog/category/board"> <i class="fa-solid fa-tag fa-sm"></i> board</a> </p> </header> <article class="post-content"> <p class="note-context"><a href="/bios/">返回 BIOS 专题索引</a> · 整理自个人笔记，平台相关结论以原记录环境为准。</p> <div id="table-of-contents"> <ul id="toc" class="section-nav"> </ul> </div> <hr> <div id="markdown-content"> <p>2023/10/24 17:40:29</p> <p>键盘和鼠标控制器</p> <p>键盘和鼠标作为电脑的基础输入设备。由于键盘的按键数量庞大，从而无法像单片机的按键那样通过微动开关和去抖动电路，直接将其连接到处理器（或中断控制器）的中断请求引脚。同理，鼠标设备也不能使用这种方式向处理器发送数据，它们都必须借助控制器才能向处理器发送中断请求和数据。</p> <p>对于现代电脑，其主板中都集成有Intel 8042键盘控制器或兼容芯片，该芯片不光用于控制键盘设备，还控制着A20地址线的开启，系统重启及操作鼠标控制器等功能。</p> <p>上图涵盖了Intel 8042键盘控制器支持的常用功能，大体上可分为8042控制器，键盘控制器（PS/2接口），鼠标控制器（PS/2接口）三部分。下面将对它们逐一讲解。</p> <p>1.Intel 8042键盘控制器</p> <p>Intel 8042键盘控制器除了可与键盘鼠标外设进行交互外，还拥有几组用于控制诸如A20地址线，系统重启，屏幕颜色，扩展内存等功能的引脚，通过I/O端口0x60和0x64可访问8042键盘控制器，进而管理这些功能。</p> <p>1.1.Intel 8042键盘控制器的操作端口</p> <p>端口0x60和0x64都是1B的双向读写I/O端口地址，它们不光可向Intel 8042键盘控制器发送数据，还可向键盘发送数据。由于I/O端口的数据位宽有限，因此，不管是控制Intel 8042键盘控制器，还是控制键盘鼠标，都需采用命令加参数的通信方式。</p> <table> <thead> <tr> <th> </th> <th> </th> <th> </th> <th> </th> </tr> </thead> <tbody> <tr> <td>端口</td> <td>读写</td> <td>名称</td> <td>功能描述</td> </tr> <tr> <td>0x60</td> <td>读</td> <td>输出缓冲区</td> <td>返回键盘扫描码或8042键盘控制器发来的数据</td> </tr> <tr> <td>0x60</td> <td>写</td> <td>输入缓冲区</td> <td>可向键盘发送命令（如命令带参数，随后再向该端口发送参数），或向8042键盘控制器发送命令参数</td> </tr> <tr> <td>0x64</td> <td>读</td> <td>控制器状态</td> <td>返回8042键盘控制器的状态，其各位功能描述如下：<br><br>bit 7=1：说明与键盘通信时发生奇偶校验错误<br><br>bit 6=1：说明接收键盘数据超时<br><br>bit 5=1:说明鼠标输出缓冲区已满<br><br>bit 4=0：禁止键盘<br><br>bit 3：记录上次操作的端口号（键盘控制器内部使用），1为0x64端口，0为0x60端口。<br><br>bit 2=1：说明控制器已完成自检<br><br>bit 1=1：说明键盘输入缓冲区已满<br><br>bit 0=1：说明键盘输出缓冲区已满</td> </tr> <tr> <td>0x64</td> <td>写</td> <td>控制器命令</td> <td>向8042键盘控制器发送控制命令</td> </tr> </tbody> </table> <p>1.2.Intel 8042键盘控制器的控制命令</p> <p>系统可通过向I/O端口0x64发送1B的控制命令操作8042键盘控制器，如该命令需附加参数，则再向I/O端口0x60发送命令数值。对某些返回应答数据的控制命令，其应答数据将发往端口0x60。</p> <p>下表已列举出常用的控制命令，其中就包括用于控制鼠标的D4h命令，控制外围端口的输入输出命令及测试端口命令。</p> <table> <thead> <tr> <th> </th> <th> </th> <th> </th> <th> </th> </tr> </thead> <tbody> <tr> <td>命令</td> <td>参数</td> <td>返回值</td> <td>功能描述</td> </tr> <tr> <td>20h</td> <td>无</td> <td>有</td> <td>读取键盘的配置值</td> </tr> <tr> <td>60h</td> <td>有</td> <td>无</td> <td>向键盘发送配置命令，配置值（参数）各位的功能如下。<br><br>bit 7=0：0<br><br>bit 6=1：在扫描码存入输入缓存区前，将其转换为第一套扫描码。<br><br>bit 5=0：使能鼠标设备<br><br>bit 4=0：使能键盘设备<br><br>bit 3=0：0<br><br>bit 2=1：通知系统已完成热启动测试及初始化<br><br>bit 1=1：使能鼠标中断IRQ12（MIBF）<br><br>bit 0=1：使能键盘中断IRQ1（IBF）</td> </tr> <tr> <td>A7h</td> <td>无</td> <td>无</td> <td>禁止鼠标端口</td> </tr> <tr> <td>A8h</td> <td>无</td> <td>无</td> <td>开启鼠标端口</td> </tr> <tr> <td>A9h</td> <td>无</td> <td>有</td> <td>鼠标端口自检测试，返回值00h表示正常</td> </tr> <tr> <td>AAh</td> <td>无</td> <td>有</td> <td>控制器自检测试，返回值55h表示正常</td> </tr> <tr> <td>ABh</td> <td>无</td> <td>有</td> <td>键盘端口自检测试，返回值00h表示正常</td> </tr> <tr> <td>ADh</td> <td>无</td> <td>无</td> <td>禁止键盘通信，自动复位控制器状态的第4位</td> </tr> <tr> <td>AEh</td> <td>无</td> <td>无</td> <td>开启键盘通信，自动置位控制器状态的第4位</td> </tr> <tr> <td>C0h</td> <td>无</td> <td>有</td> <td>读输入端口P1</td> </tr> <tr> <td>D0h</td> <td>无</td> <td>有</td> <td>读输出端口P2</td> </tr> <tr> <td>D1h</td> <td>有</td> <td>无</td> <td>写输出端口P2</td> </tr> <tr> <td>D2h</td> <td>有</td> <td>无</td> <td>把参数写入到键盘缓冲区，就如同从键盘收到数据一样</td> </tr> <tr> <td>D3h</td> <td>有</td> <td>无</td> <td>把参数写入到鼠标缓冲区，就如同从鼠标收到数据一样</td> </tr> <tr> <td>D4h</td> <td>有</td> <td>无</td> <td>向鼠标设备发送数据</td> </tr> <tr> <td>E0h</td> <td>无</td> <td>无</td> <td>读测试端口P3</td> </tr> <tr> <td>FEh</td> <td>无</td> <td>无</td> <td>系统重启</td> </tr> </tbody> </table> <p>在这些常用命令中，20h和60h命令是控制键盘鼠标必备的命令，而命令C0h,D0h,D1h,E0h则用于控制输入，输出及测试端口各引脚的状态值。这些引脚的功能各不相同。</p> <table> <thead> <tr> <th> </th> <th> </th> <th> </th> <th> </th> <th> </th> <th> </th> </tr> </thead> <tbody> <tr> <td>输入端口P1（Port1）</td> <td> </td> <td>输出端口P2（Port2）</td> <td> </td> <td>测试端口P3（Port3）</td> <td> </td> </tr> <tr> <td>引脚</td> <td>功能描述</td> <td>引脚</td> <td>功能描述</td> <td>引脚</td> <td>功能描述</td> </tr> <tr> <td>0</td> <td>键盘数据</td> <td>0</td> <td>系统重启</td> <td>0</td> <td>键盘时钟</td> </tr> <tr> <td>1</td> <td>鼠标数据</td> <td>1</td> <td>A20地址线</td> <td>1</td> <td>键盘数据</td> </tr> <tr> <td>2</td> <td> </td> <td>2</td> <td>鼠标数据</td> <td>2</td> <td> </td> </tr> <tr> <td>3</td> <td> </td> <td>3</td> <td>鼠标时钟</td> <td>3</td> <td> </td> </tr> <tr> <td>4</td> <td> </td> <td>4</td> <td>键盘IBF中断</td> <td>4</td> <td> </td> </tr> <tr> <td>5</td> <td> </td> <td>5</td> <td>鼠标IBF中断</td> <td>5</td> <td> </td> </tr> <tr> <td>6</td> <td> </td> <td>6</td> <td>键盘时钟</td> <td>6</td> <td> </td> </tr> <tr> <td>7</td> <td> </td> <td>7</td> <td>键盘数据</td> <td>7</td> <td> </td> </tr> </tbody> </table> <p>在这些端口引脚中，本系统可能会用到Port2端口的Pin0和Pin1引脚，剩余引脚使用频率非常低。这两个引脚分别控制着系统重启功能和A20地址线。</p> <p>1.3.A20地址线功能</p> <p>第4章就已经对A20地址线的作用和开启方法进行了讲解，并用代码实现了一种快速开启A20地址线的方式。此处通过拉高Port2端口Pin1引脚的电平来开启A20地址线的方式，在执行速度方面相对较慢，这种开启方式仅供读者参数。</p> <p>1.4.系统重启方式</p> <p>通过拉低Port2端口的Pin0引脚可使系统重启，或向I/O端口0x64发送控制命令FEh来重启系统。</p> <p>2.键盘控制器</p> <p>键盘是计算机的一种重要输入设备，它的工作原理是通过类8048键盘编码器芯片不停地扫描键盘上的每一个按键，一旦发现有按键被按下或抬起，8048键盘编码器芯片便立即将按键对应的键盘扫描码发送至类8042键盘控制器。而类8042键盘控制器会将数据解析后保存到输入缓冲区中，并触发键盘按键中断请求。</p> <p>8048键盘编码器芯片共定义三套不同格式的键盘扫描码，现代键盘默认采用第二套键盘扫描码，但为了兼容以前的XT键盘，8042键盘控制器在接收到键盘扫描码后，都默认将其转换为第一套键盘扫描码。通过向I/O端口0x60发送键盘命令可修改默认的键盘扫描码。</p> <p>2.1.键盘命令</p> <p>Intel 8042键盘控制器为我们准备了丰富的键盘控制命令，这些命令依然通过I/O端口0x60发往键盘控制器。如命令需携带参数，则紧随命令之后参数再写入到0x60端口，一些键盘命令会在执行后回送应答数据（0xFA）。</p> <table> <thead> <tr> <th> </th> <th> </th> <th> </th> <th> </th> </tr> </thead> <tbody> <tr> <td>命令</td> <td>参数</td> <td>返回值</td> <td>功能描述</td> </tr> <tr> <td>FFh</td> <td>无</td> <td>有</td> <td>重启键盘</td> </tr> <tr> <td>FEh</td> <td>无</td> <td>无</td> <td>重新发送上一字节</td> </tr> <tr> <td>F6h</td> <td>无</td> <td>无</td> <td>使用默认按键速率</td> </tr> <tr> <td>F5h</td> <td>无</td> <td>无</td> <td>停止键盘扫描</td> </tr> <tr> <td>F4h</td> <td>无</td> <td>无</td> <td>开启键盘扫描</td> </tr> <tr> <td>F3h</td> <td>有</td> <td>无</td> <td>设置按键速率</td> </tr> <tr> <td>F2h</td> <td>无</td> <td>有</td> <td>获取键盘的设备ID号(2B)</td> </tr> <tr> <td>F0h</td> <td>有</td> <td>无</td> <td>设置键盘使用的扫描码集，可用参数值如下：<br><br>0x0：取得当前扫描码（有返回值）<br><br>0x1：代表第一套扫描码<br><br>0x2：代表第二套扫描码<br><br>0x3：代表第三套扫描码</td> </tr> <tr> <td>EEh</td> <td>无</td> <td>有</td> <td>键盘回复EEh</td> </tr> <tr> <td>EDh</td> <td>有</td> <td>无</td> <td>控制LED灯亮灭，参数各位功能说明如下：<br><br>位2：Caps Lock灯1（亮）、0（灭）<br><br>位1：Num Lock灯1（亮）、0（灭）<br><br>位0：Scroll Lock灯1（亮）、0（灭）</td> </tr> </tbody> </table> <p>2.2.键盘扫描码</p> <p>XT型键盘使用的键盘扫描码称为第一套键盘扫描码，它仅使用1B数据就描述了绝大部分按键的按下与抬起状态。相比下，第二套和第三套键盘扫描码需更多数据来描述按键状态。鉴于第一套键盘扫描码数据量小，便于解析，且键盘控制器在默认下仍将接收到的数据转换为第一套键盘扫描码，所以本系统也采用第一套键盘扫描码来描述按键状态。</p> <p>3.鼠标控制器</p> <p>鼠标和键盘都被接入到键盘控制器的PS/2接口上，由此可见，鼠标设备的控制方法与键盘设备类似。在之前表列出的键盘控制器命令中，已经提供了向鼠标设备发送数据的控制命令D4h，通过向I/O端口0x64发送控制命令D4h，8042键盘控制器就可将I/O端口0x60保存的鼠标控制命令发送至鼠标设备。</p> <p>3.1.鼠标控制命令</p> <p>Intel 8042键盘控制器同样为我们准备了丰富的鼠标控制命令。大部分鼠标控制命令在执行结束后都会向8042键盘控制器发送应答数据（0xFA）。</p> <table> <thead> <tr> <th> </th> <th> </th> <th> </th> <th> </th> <th> </th> <th> </th> <th> </th> <th> </th> <th> </th> </tr> </thead> <tbody> <tr> <td>KEY</td> <td>MAKE</td> <td>BREAK</td> <td>KEY</td> <td>MAKE</td> <td>BREAK</td> <td>KEY</td> <td>MAKE</td> <td>BREAK</td> </tr> <tr> <td>A</td> <td>1E</td> <td>9E</td> <td>9</td> <td>0A</td> <td>8A</td> <td>[</td> <td>1A</td> <td>9A</td> </tr> <tr> <td>B</td> <td>30</td> <td>B0</td> <td>’</td> <td>29</td> <td>A9</td> <td>INSERT</td> <td>E0,52</td> <td>E0,D2</td> </tr> <tr> <td>C</td> <td>2E</td> <td>AE</td> <td>-</td> <td>0C</td> <td>8C</td> <td>HOME</td> <td>E0,47</td> <td>E0,C7</td> </tr> <tr> <td>D</td> <td>20</td> <td>A0</td> <td>=</td> <td>0D</td> <td>8D</td> <td>PG UP</td> <td>E0,49</td> <td>E0,C9</td> </tr> <tr> <td>E</td> <td>12</td> <td>92</td> <td>|2B</td> <td>AB</td> <td>DELETE</td> <td>E0,53</td> <td>E0,D3</td> <td> </td> </tr> <tr> <td>F</td> <td>21</td> <td>A1</td> <td>BKSP</td> <td>0E</td> <td>8E</td> <td>END</td> <td>E0,4F</td> <td>E0,CF</td> </tr> <tr> <td>G</td> <td>22</td> <td>A2</td> <td>SPACE</td> <td>39</td> <td>B9</td> <td>PG DN</td> <td>E0,51</td> <td>E0,D1</td> </tr> <tr> <td>H</td> <td>23</td> <td>A3</td> <td>TAB</td> <td>0F</td> <td>8F</td> <td>U ARROW</td> <td>E0,48</td> <td>E0,C8</td> </tr> <tr> <td>I</td> <td>17</td> <td>97</td> <td>CAPS</td> <td>3A</td> <td>BA</td> <td>L ARROW</td> <td>E0,4B</td> <td>E0,CB</td> </tr> <tr> <td>J</td> <td>24</td> <td>A4</td> <td>L SHFT</td> <td>2A</td> <td>AA</td> <td>D ARROW</td> <td>E0,50</td> <td>E0,D0</td> </tr> <tr> <td>K</td> <td>25</td> <td>A5</td> <td>L CTRL</td> <td>1D</td> <td>9D</td> <td>R ARROW</td> <td>E0,4D</td> <td>E0,CD</td> </tr> <tr> <td>L</td> <td>26</td> <td>A6</td> <td>L GUI</td> <td>E0,5B</td> <td>E0,DB</td> <td>NUM</td> <td>45</td> <td>C5</td> </tr> <tr> <td>M</td> <td>32</td> <td>B2</td> <td>L ALT</td> <td>38</td> <td>B8</td> <td>KP/</td> <td>E0,35</td> <td>E0,B5</td> </tr> <tr> <td>N</td> <td>31</td> <td>B1</td> <td>R SHFT</td> <td>36</td> <td>B6</td> <td>KP*</td> <td>37</td> <td>B7</td> </tr> <tr> <td>O</td> <td>18</td> <td>98</td> <td>R CTRL</td> <td>E0,1D</td> <td>E0,9D</td> <td>KP-</td> <td>4A</td> <td>CA</td> </tr> <tr> <td>P</td> <td>19</td> <td>99</td> <td>R GUI</td> <td>E0,5C</td> <td>E0,DC</td> <td>KP+</td> <td>4E</td> <td>CE</td> </tr> <tr> <td>Q</td> <td>10</td> <td>90</td> <td>R ALT</td> <td>E0,38</td> <td>E0,B8</td> <td>KP EN</td> <td>E0,1C</td> <td>E0,9C</td> </tr> <tr> <td>R</td> <td>13</td> <td>93</td> <td>APPS</td> <td>E0,5D</td> <td>E0,DD</td> <td>KP.</td> <td>53</td> <td>D3</td> </tr> <tr> <td>S</td> <td>1F</td> <td>9F</td> <td>ENTER</td> <td>1C</td> <td>9C</td> <td>KP 0</td> <td>52</td> <td>D2</td> </tr> <tr> <td>T</td> <td>14</td> <td>94</td> <td>ESC</td> <td>01</td> <td>81</td> <td>KP 1</td> <td>4F</td> <td>CF</td> </tr> <tr> <td>U</td> <td>16</td> <td>96</td> <td>F1</td> <td>3B</td> <td>BB</td> <td>KP 2</td> <td>3F</td> <td>CF</td> </tr> <tr> <td>V</td> <td>2F</td> <td>AF</td> <td>F2</td> <td>3C</td> <td>BC</td> <td>KP 3</td> <td>51</td> <td>D1</td> </tr> <tr> <td>W</td> <td>11</td> <td>91</td> <td>F3</td> <td>3D</td> <td>BD</td> <td>KP 4</td> <td>4B</td> <td>CB</td> </tr> <tr> <td>X</td> <td>2D</td> <td>AD</td> <td>F4</td> <td>3E</td> <td>BE</td> <td>KP 5</td> <td>4C</td> <td>CC</td> </tr> <tr> <td>Y</td> <td>15</td> <td>95</td> <td>F5</td> <td>3F</td> <td>BF</td> <td>KP 6</td> <td>4D</td> <td>CD</td> </tr> <tr> <td>Z</td> <td>2C</td> <td>AC</td> <td>F6</td> <td>40</td> <td>C0</td> <td>KP 7</td> <td>47</td> <td>C7</td> </tr> <tr> <td>0</td> <td>0B</td> <td>8B</td> <td>F7</td> <td>41</td> <td>C1</td> <td>KP 8</td> <td>48</td> <td>C8</td> </tr> <tr> <td>1</td> <td>02</td> <td>82</td> <td>F8</td> <td>42</td> <td>C2</td> <td>KP 9</td> <td>49</td> <td>C9</td> </tr> <tr> <td>2</td> <td>03</td> <td>83</td> <td>F9</td> <td>43</td> <td>C3</td> <td>]</td> <td>1B</td> <td>9B</td> </tr> <tr> <td>3</td> <td>04</td> <td>84</td> <td>F10</td> <td>44</td> <td>C4</td> <td>;</td> <td>27</td> <td>A7</td> </tr> <tr> <td>4</td> <td>05</td> <td>85</td> <td>F11</td> <td>57</td> <td>D7</td> <td>’</td> <td>28</td> <td>A8</td> </tr> <tr> <td>5</td> <td>06</td> <td>86</td> <td>F12</td> <td>58</td> <td>D8</td> <td>.</td> <td>33</td> <td>B3</td> </tr> <tr> <td>6</td> <td>07</td> <td>87</td> <td>PRNT<br><br>SCRN</td> <td>E0,2A<br><br>E0,37</td> <td>E0,B7<br><br>E0,AA</td> <td>.</td> <td>34</td> <td>B4</td> </tr> <tr> <td>7</td> <td>08</td> <td>88</td> <td>SCROLL</td> <td>46</td> <td>C6</td> <td>/</td> <td>35</td> <td>B5</td> </tr> <tr> <td>8</td> <td>09</td> <td>89</td> <td>PAUSE</td> <td>E1,1D,45<br><br>E1,9D,C5</td> <td>-</td> <td>-</td> <td>-</td> <td>-</td> </tr> </tbody> </table> <table> <thead> <tr> <th> </th> <th> </th> </tr> </thead> <tbody> <tr> <td>命令</td> <td>功能描述</td> </tr> <tr> <td>FFh</td> <td>重启鼠标</td> </tr> <tr> <td>FEh</td> <td>重新发送上一条数据包</td> </tr> <tr> <td>F6h</td> <td>使用默认采样率100hZ,分辨率4 pixel/mm</td> </tr> <tr> <td>F5h</td> <td>禁止鼠标设备发送数据包</td> </tr> <tr> <td>F4h</td> <td>允许鼠标设备发送数据包</td> </tr> <tr> <td>F3h</td> <td>设置鼠标采样率</td> </tr> <tr> <td>F2h</td> <td>获得鼠标设备的ID号</td> </tr> <tr> <td> </td> <td> </td> </tr> <tr> <td> </td> <td> </td> </tr> </tbody> </table> <p>3.2.鼠标数据包格式</p> <p>与键盘设备不同，鼠标设备上报的数据并非键盘扫描码，而是一个数据包。数据包记录着鼠标移动轨迹和当前按键状态， 数据包根据鼠标设备的ID号可进一步分为3B和4B两种数据包。当鼠标设备的ID号为3或4时，鼠标设备才会发送第4字节数据，但大部分鼠标设备的ID号为0。</p> <p>Byte1: Y溢出 X溢出 Y符号位 X符号位 1 鼠标中键 鼠标右键 鼠标左键</p> <p>Byte2: X移动值</p> <p>Byte3: Y移动值</p> <p>Byte4: Z移动值                                                                                                ID值为3</p> <p>Byte5: 0 0 鼠标第5键 鼠标第4键 Z3 Z2 Z1 Z0                                                ID值为4</p> <p>从上表可知，4B数据包还可根据鼠标设备ID号详细分为两种格式。当鼠标设备的ID号为3时，数据包的第4字节记录着鼠标垂直滚轮的移动值（Z移动值）；当鼠标设备的ID号为4时，数据包的第4字节记录着鼠标扩展按键状态（第4/5按键）和滚轮移动值（Z0~3）。</p> <table> <thead> <tr> <th> </th> <th> </th> </tr> </thead> <tbody> <tr> <td>名称</td> <td>功能描述</td> </tr> <tr> <td>X/Y溢出</td> <td>表示X或Y方向数值溢出，并丢弃整个数据包</td> </tr> <tr> <td>X/Y符号位</td> <td>表示鼠标在平面直角坐标系内的移动方向</td> </tr> <tr> <td>X/Y/Z移动值</td> <td>记录X,Y或Z方向的移动值</td> </tr> <tr> <td>左/中/右/第4/第5按键</td> <td>记录鼠标按键状态</td> </tr> <tr> <td>Z0~3</td> <td>记录鼠标滚轮滚动方向</td> </tr> </tbody> </table> <p>上表的X/Y表示鼠标相对上一个采集点的移动方向和距离，它们皆是由符号位和移动值组成的9位二进制补码，符号位代表移动方向。而Z表示鼠标滚轮的滚动方向和距离，其表示方法与X/Y相同，下表描述了水平滚轮和垂直滚轮的4个滚动方向。</p> <table> <thead> <tr> <th> </th> <th> </th> </tr> </thead> <tbody> <tr> <td>Z0~3</td> <td>功能描述</td> </tr> <tr> <td>0</td> <td>无滚动</td> </tr> <tr> <td>1</td> <td>垂直向上滚动</td> </tr> <tr> <td>F</td> <td>垂直向下滚动</td> </tr> <tr> <td>2</td> <td>水平向右滚动</td> </tr> <tr> <td>E</td> <td>水平向左滚动</td> </tr> </tbody> </table> <p>鼠标双击不是硬件逻辑，而是借助软件逻辑实现的。</p> <p>完善键盘驱动</p> <p>1.键盘初始化函数</p> <p>编写设备驱动程序前，通常会为设备驱动定义一系列结构体来描述设备的独有特性，键盘驱动程序也不例外。首先为键盘设备定义结构体来描述它的独有特性，并定义一些宏常量使操作寄存器的过程更易于理解。</p> <p>struct keyboard_inputbuffer便是此次用于描述键盘设备的结构体。</p> <p>这个结构体为键盘设备定义了一个100B的循环队列缓冲区，缓冲区首尾指针及缓冲数据计数器。代码还为键盘驱动程序准备了一些便于理解的宏常量，以提升驱动程序的可读性。</p> <p>代码定义了键盘控制器的I/O端口，命令，及初始数值等相关宏常量。</p> <table> <thead> <tr> <th> </th> <th> </th> <th> </th> </tr> </thead> <tbody> <tr> <td>宏常量名</td> <td>数值</td> <td>功能描述</td> </tr> <tr> <td>PORT_KB_DATA</td> <td>0x60</td> <td>I/O端口0x60</td> </tr> <tr> <td>PORT_KB_STATUS</td> <td>0x64</td> <td>I/O端口0x64</td> </tr> <tr> <td>PORT_KB_CMD</td> <td>0x64</td> <td>I/O端口0x64</td> </tr> <tr> <td>KBCMD_WRITE_CMD</td> <td>0x60</td> <td>向键盘发送配置命令，KB_INIT_MODE是命令参数</td> </tr> <tr> <td>KBCMD_READ_CMD</td> <td>0x20</td> <td>读取键盘的配置值</td> </tr> <tr> <td>KB_INIT_MODE</td> <td>0x47</td> <td>发往键盘的配置值，其各位的设置状态如下：<br><br>bit 7=0：0<br><br>bit 6=1: 在扫描码存入输入缓存区前，将其转换为第一套扫描码<br><br>bit 5=0: 使能鼠标<br><br>bit 4=0: 使能键盘<br><br>bit 3=0: 0<br><br>bit 2=1: 通知系统已完成热启动测试及初始化<br><br>bit 1=1: 使能鼠标中断IRQ12(M!BF)<br><br>bit 0=1: 使能键盘中断IRQ1(IBF)</td> </tr> </tbody> </table> <p>除此之外，还定义了一对宏函数来检测输入/输出缓冲区是否已满，检测方法是读取I/O端口0x64的控制器状态位。</p> <p>此番准备后，就实现键盘的初始化（挂载）函数keyboard_init。键盘的初始化过程不光需要对键盘控制器进行配置，还需对I/O APIC的I/O中断定向投递寄存器（RTE表项）进行配置。</p> <p>程序起始处，定义了一些全局变量。用于记录功能键的按键状态，这些全局变量会在keyboard_init函数中被初始化。函数keyboard_init的首要任务是动态创建struct keyboard_inputbuffer结构体的存储空间，并对其进行初始化赋值。</p> <p>随后，再对I/O APIC的RTE1表项进行配置，进而将键盘设备的中断请求投递至Local APIC ID为0的处理器核心（BSP处理器）中。</p> <p>紧接着，通过向键盘控制器发送控制命令使能键盘设备和IRQ1中断请求。此处，还使能了鼠标设备及IRQ12中断请求。由于现在鼠标设备对应的RTE表项寄存器仍处于屏蔽状态，因此不会响应鼠标发出的中断请求。接下来的一百万次无操作（nop宏函数封装着汇编指令NOP，即无操作指令）循环只是为了拖延时间，使低速的键盘控制器把控制命令执行完。最后，调register_irq函数向系统注册键盘设备的中断处理程序。</p> <p>虽然本系统目前无法实现驱动程序的动态挂载与卸载，但驱动卸载函数作为驱动程序的一部分是必不可少的。</p> <p>卸载过程非常简单，只需调中断注销函数，再释放struct keyboard_inputbuffer。</p> <p>关于注册键盘中断处理程序时使用的中断处理接口keyboard_int_controller，它是采用此前已编写好的操作接口封装而成的。</p> <p>·        2.键盘中断处理函数</p> <p>在键盘驱动初始化函数中，还有一个函数未介绍。那就是键盘中断处理函数（中断上半部处理函数）。键盘中断处理函数的主要任务是从I/O端口0x60读取键盘扫描码，并将其存入struct keyboard_inputbuffer结构体内的循环队列缓冲区，再调整循环队列缓冲区首尾指针及缓冲区计数器。</p> <p>至此，键盘驱动程序已基本实现。下面对do_IRQ进行调整。</p> <p>3.键盘扫描码解析函数</p> <p>如此刻测试键盘驱动程序，内核只能打印出键盘扫描码。根据前文，我们只有解析了键盘扫描码后，才能分辨出按键字符。现在去实现键盘扫描码解析函数。</p> <p>为了让键盘扫描码解析函数可快速检索出扫描码的按键，特将键盘扫描码归纳为三类，第一类是以0xE1开头的PauseBreak键，第二类是以0xE0开头的功能键，第三类是1B普通按键。</p> <p>再实现键盘扫描码解析函数前，依然要定义一些宏常量。</p> <p>在这些宏常量中，NR_SCAN_CODES*MAP_COLS描述了一个由第三类键盘扫描码组成的一维数组的长度，共128个按键，每个按键包含普通按键和Shift加普通按键两种状态；宏常量PAUSEBREAK，PRINTSCREEN和OTHERKEY表示第一类和第二类特殊按键。</p> <p>一维数组keycode_map_normal里的按键字符是根据键盘扫描码值升序排列到数组中，而数组pausebreak_scode值保存着PauseBreak键的扫描码值。</p> <p>此刻，解析键盘扫描码的绝大部分准备工作已经就绪，马上进入键盘扫描码解析函数analysis_keycode的实现。</p> <p>键盘扫描码解析函数入口部分，它先为几个局部变量开辟了栈存储空间，再通过get_scancode从键盘循环队列缓冲区中读取1B数据到局部变量x中，并对局部变量x的数值进行判断。</p> <p>当局部变量x的数值为0xE1时，则继续从键盘循环队列缓冲区中读取数据，并与第一类键盘扫描码数组中的元素进行逐个比对，如数值完全相同，就认为PauseBreak键被按下。如局部变量x的数值不为0xE1，则继续检索其他两类键盘扫描码。</p> <p>代码中的get_scancode函数通过读取键盘驱动程序的循环队列缓冲区，将中断处理函数捕获的键盘扫描码传递给键盘扫描码解析函数。</p> <p>如循环队列缓冲区为空，则等待键盘发送数据。否则从循环队列缓冲区中读取1B数据返回给函数调用者，并在函数返回前调整缓冲区首尾指针及缓冲区计数器。</p> <p>既然按键不属于第一类键盘扫描码，则通过代码检测按键是否属于第二类键盘扫描码，其检测过程依然采用逐个字节匹配法。</p> <p>代码只对Print Screen，Right Ctrl，Right Alt三个第二类键盘扫描码进行检测，其他按键暂时忽略。如检测出相匹配的键盘扫描码，则用key, ctrl_r或alt_r变量进行记录。如局部变量x的数值也不属于第二类键盘扫描码，则继续检索第三类键盘扫描码。</p> <p>代码先判断局部变量key的数值，以确定其是否与第一类或第二类键盘扫描码匹配成功，如未匹配成功，则通过本段程序与第三类键盘扫描码匹配。</p> <p>keyboardSwap( )</p> <pre><code class="language-mermaid">flowchart TD
+
+    A[开始] --&gt; B{设置超时值}
+
+    B --&gt;|成功| C[锁定键盘]
+
+    C --&gt; D[禁用键盘和辅助设备]
+
+    D --&gt; E{读取键盘控制器版本}
+
+    E --&gt;|版本正确| F[读取键盘ID]
+
+    F --&gt; G{读取到正确ID}
+
+    G --&gt;|是| H[端口交换]
+
+    G --&gt;|否| I{读取ACK}
+
+    I --&gt; J{ACK为0xFE}
+
+    J --&gt;|是| K[重新读取键盘ID]
+
+    K --&gt; L{读取ACK}
+
+    L --&gt; M{ACK为KB_ACK_COM}
+
+    M --&gt;|是| N{读取数据}
+
+    N --&gt; O{数据为0}
+
+    O --&gt;|是| H
+
+    O --&gt;|否| P{读取数据}
+
+    P --&gt; Q{无超时错误}
+
+    Q --&gt;|是| R[返回]
+
+    Q --&gt;|否| S{读取键盘ID}
+
+    S --&gt; T{读取ACK}
+
+    T --&gt; U{ACK为KB_ACK_COM}
+
+    U --&gt;|是| V{读取数据}
+
+    V --&gt; W{无数据}
+
+    W --&gt; X[返回]
+
+    W --&gt; Y{有数据}
+
+    Y --&gt; Z{有超时错误}
+
+    Z --&gt;|是| R
+
+    Z --&gt;|否| H
+
+    E --&gt;|版本不正确| R
+</code></pre> <pre><code class="language-C">// &lt;AMI_PHDR_START&gt;
+//-------------------------------------------------------------------------
+//
+// Procedure: SioPeiInitEntryPoint
+//
+// Description:
+//  This function provide PEI phase SIO initialization
+//
+// Input:
+//  IN  EFI_FFS_FILE_HEADER    *FfsHeader - Logical Device's information
+//  IN  EFI_PEI_SERVICES       **PeiServices  - Read/Write PCI config space
+//
+// Output:    None
+//
+// Modified:  Nothing
+//
+// Referrals: None
+//
+// Note:
+//-------------------------------------------------------------------------
+// &lt;AMI_PHDR_END&gt;
+EFI_STATUS NCT5532DPeiInitEntryPoint(
+        IN       EFI_PEI_FILE_HANDLE  FileHandle,
+        IN CONST EFI_PEI_SERVICES     **PeiServices
+)
+{
+    UINT8 index;
+    UINT8 ACPI0xE0Value=0,NewACPI0xE0Value=0;
+    UINT8 PS2ID=0;
+    UINT8 IsMouse=BIT2;
+
+    for(index=0; index&lt;sizeof(NCT5532DPeiDecodeTable)/sizeof(IO_DECODE_DATA); index++)
+        AmiSioLibSetLpcDeviceDecoding(NULL, NCT5532DPeiDecodeTable[index].BaseAdd, NCT5532DPeiDecodeTable[index].UID, NCT5532DPeiDecodeTable[index].Type);
+
+    //The PS2 inferface is conected to a mouse
+    IoWrite8(0x72,0x62);
+    PS2ID=IoRead8(0x73);
+    if (PS2ID!=0xFF)
+    {
+        IoWrite8(0x72,0x64);
+        IoWrite8(0x73,PS2ID);
+    }
+
+    if (PS2ID==0x00)
+    {
+        IsMouse|=BIT2;
+        IoWrite8(0x72,0x63);
+        IoWrite8(0x73,0x01);
+
+        IoWrite8(0x72,0x62);
+        IoWrite8(0x73,0xFF);
+
+    }else if (PS2ID==0xAB)
+    {
+        IsMouse=0;
+        IoWrite8(0x72,0x63);
+        IoWrite8(0x73,0x01);
+
+        IoWrite8(0x72,0x62);
+        IoWrite8(0x73,0xFF);
+    }
+
+    //Enter to congig mode
+    IoWrite8(NCT5532D_CONFIG_INDEX,NCT5532D_CONFIG_MODE_ENTER_VALUE);
+    IoWrite8(NCT5532D_CONFIG_INDEX,NCT5532D_CONFIG_MODE_ENTER_VALUE);
+    //Select ACPI device
+    IoWrite8(NCT5532D_CONFIG_INDEX,NCT5532D_LDN_SEL_REGISTER);
+    IoWrite8(NCT5532D_CONFIG_DATA,NCT5532D_LDN_ACPI);
+    //Check 0xE0 status
+    IoWrite8(NCT5532D_CONFIG_INDEX,0xE0);
+    ACPI0xE0Value=IoRead8(NCT5532D_CONFIG_INDEX);
+    ACPI0xE0Value&amp;=0x00;
+    NewACPI0xE0Value=ACPI0xE0Value|IsMouse;
+    //Write value to 0xE0
+    IoWrite8(NCT5532D_CONFIG_INDEX,0xE0);
+    IoWrite8(NCT5532D_CONFIG_DATA,NewACPI0xE0Value);
+
+    //Exit config mode
+    IoWrite8(NCT5532D_CONFIG_INDEX,NCT5532D_CONFIG_MODE_EXIT_VALUE);
+    IoWrite8(0x72,0x65);
+    IoWrite8(0x73,NewACPI0xE0Value);
+    ProgramRtRegisterTable(0, NCT5532DPeiInitTable, sizeof(NCT5532DPeiInitTable)/sizeof(SIO_DEVICE_INIT_DATA));
+
+    return EFI_SUCCESS;
+}
+</code></pre> <pre><code class="language-C">/**
+    PS/2 Controller Driver Start function
+    This function is a part of DriverBinfing protocol
+
+    @param    *This                - Pointer to this instance of the driver binding protocol
+              Controller           - Handle for this controller
+              *RemainingDevicePath - Pointer to last node in device path
+
+    @retval    EFI_STATUS Status of the operation
+
+**/
+
+EFI_STATUS
+EFIAPI
+PS2CtlStart (
+    EFI_DRIVER_BINDING_PROTOCOL *This,
+    EFI_HANDLE                  Controller,
+    EFI_DEVICE_PATH_PROTOCOL    *RemainingDevicePath)
+{
+    ACPI_HID_DEVICE_PATH    *acpiDP;
+    PS2DEV_TABLE            *ps2dev = 0;
+    EFI_STATUS              Status;
+    EFI_TPL                 OldTpl;
+
+    // The following code performs the basic KBC initialization
+    // It has to be executed only once, we use global variable
+    // gDriverStartCounter to control this. Also, this code is
+    // executed on a higher TPL to prevent re-entrance.
+    OldTpl = gBS-&gt;RaiseTPL(TPL_NOTIFY);
+    if (OldTpl &gt; TPL_NOTIFY) return EFI_DEVICE_ERROR;
+
+    while (!gDriverStartCounter) {
+        // Disable the Keyboard IRQ if it's enabled before
+        // Finish all the Keyboard Initialization and Re-enable the IRQ again
+        if(KbRdBeforeInstall){
+            mLegacy8259-&gt;DisableIrq( mLegacy8259, SYSTEM_KEYBOARD_IRQ );
+            gKeyboardIrqInstall=FALSE;
+        }
+        // Initialize KBC hardware
+        if ( KbcBasicAssuranceTest ) {
+            Status = KBCBatTest();      // Perform KBC Basic Assurance Test
+            if (EFI_ERROR(Status)) {
+                // Report the Error code if the BAT test failed
+                // ReportStatusCode (EFI_ERROR_CODE|EFI_ERROR_MAJOR,(EFI_PERIPHERAL_KEYBOARD | EFI_P_KEYBOARD_EC_STUCK_KEY));
+                break;
+            }
+
+            // Check for stuck keys
+            Status = IbFreeTimeout(IbFreeTimeoutValue);
+            if (EFI_ERROR(Status)) {
+                // Report the Error Code.
+                // ReportStatusCode (EFI_ERROR_CODE|EFI_ERROR_MAJOR,(EFI_PERIPHERAL_KEYBOARD | EFI_P_KEYBOARD_EC_STUCK_KEY));
+                break;
+            }
+        }
+
+        GetKeyBoardOrMouseVersion();
+
+        // Swap ports if needed
+        if (AutodetectKbdMousePortsPtr!=NULL) AutodetectKbdMousePortsPtr();
+
+        gDriverStartCounter++;
+    }
+
+
+    if(!EFI_ERROR(GetPS2_DP(This, Controller, &amp;acpiDP, EFI_OPEN_PROTOCOL_BY_DRIVER)) &amp;&amp;
+            LookupPs2Hid(supportedDevices, acpiDP-&gt;HID, acpiDP-&gt;UID, &amp;ps2dev) ){
+             Status = ps2dev-&gt;start(This, Controller);
+
+            // End of critical section - restore TPL
+             gBS-&gt;RestoreTPL(OldTpl);
+
+            if(EFI_ERROR(Status)) {
+                return EFI_DEVICE_ERROR;
+            }
+
+            return EFI_SUCCESS;
+    }
+
+    // End of critical section - restore TPL
+    gBS-&gt;RestoreTPL(OldTpl);
+
+    // If control is here then something totally wrong happened:
+    // if device is not supported then Start shouldn't be called.
+    return EFI_DEVICE_ERROR;
+}
+
+
+VOID
+GetKeyBoardOrMouseVersion()
+{
+
+    UINT8 KMVersion = 0;
+    if (Ps2KbdDetected&amp;&amp;Ps2MouseDetected)
+    {
+        return;
+    }
+    IoWrite8(0x72,0x63);
+    if (IoRead8(0x73)==0x01)
+    {
+        IoWrite8(0x72,0x63);
+        IoWrite8(0x73,0xFF);
+        return;
+    }
+
+    WriteKeyboardData(rKeyboardID); // Read KBD ID
+
+    ObFullReadTimeout(&amp;KMVersion, 1000, TRUE); // Read ACK
+
+    WriteKeyboardCommand(0xD4);
+    WriteKeyboardData(rKeyboardID);
+    ObFullReadTimeout(&amp;KMVersion, 1000, TRUE); // Read ACK
+
+    ObFullReadTimeout(&amp;KMVersion, 100, TRUE);
+
+    IoWrite8(0x72,0x62);
+    IoWrite8(0x73,KMVersion);
+
+    IoWrite8(0x80,0x2F);
+    gBS-&gt;Stall(1000000);
+
+    IoWrite8(0xCF9,0x06);
+}
+
+</code></pre> <ol> <li> <p><strong>UEFI 启动</strong>:</p> <ul> <li>进入 PEI 阶段。</li> </ul> </li> <li> <p><strong>PEI 阶段</strong>:</p> <ul> <li>执行 <code class="language-plaintext highlighter-rouge">Super IO PEIM</code>。</li> <li>调用 <code class="language-plaintext highlighter-rouge">NCT5532DPeiInitEntryPoint</code> 函数。</li> <li>初始化 LPC 设备解码。</li> <li>读取和设置 PS2 ID。</li> <li>配置 ACPI 设备。</li> <li>编程 RT 寄存器表。</li> </ul> </li> <li> <p><strong>DXE 阶段</strong>:</p> <ul> <li>调用 <code class="language-plaintext highlighter-rouge">GetKeyBoardOrMouseVersion</code> 函数。</li> <li>检查是否已检测到键盘和鼠标。 <ul> <li>如果已检测到，返回。</li> <li>如果未检测到，初始化 PS/2 控制器。 <ul> <li>检查控制器状态。 <ul> <li>如果状态为 0x01，重置控制器并返回。</li> <li>如果状态不为 0x01，读取键盘 ID。 <ul> <li>发送命令并读取应答。</li> <li>再次读取应答。</li> <li>写入版本信息。</li> <li>延迟 1 秒。</li> <li>重启系统，重新进入 PEI 阶段。</li> </ul> </li> </ul> </li> </ul> </li> </ul> </li> </ul> </li> </ol> <pre><code class="language-mermaid">
+graph TD
+
+    A[UEFI 启动] --&gt; B[PEI 阶段]
+
+    B --&gt; C[Super IO PEIM]
+
+    C --&gt; D[调用 NCT5532DPeiInitEntryPoint]
+
+    D --&gt; E[初始化 LPC 设备解码]
+
+    E --&gt; F[读取和设置 PS2 ID]
+
+    F --&gt; G[配置 ACPI 设备]
+
+    G --&gt; H[编程 RT 寄存器表]
+
+    H --&gt; I[DXE 阶段]
+
+    I --&gt; J[PS2Ctl UEFI Driver]
+
+    J --&gt; K[调用 PS2CtlStart]
+
+    K --&gt; L[调用 GetKeyBoardOrMouseVersion]
+
+    L --&gt; M{已检测到键盘和鼠标?}
+
+    M -- 是 --&gt; N[返回]
+
+    M -- 否 --&gt; O[初始化 PS/2 控制器]
+
+    O --&gt; P{控制器状态为 0x01?}
+
+    P -- 是 --&gt; Q[重置控制器并返回]
+
+    P -- 否 --&gt; R[读取键盘 ID]
+
+    R --&gt; S[发送命令并读取应答]
+
+    S --&gt; T[再次读取应答]
+
+    T --&gt; U[写入版本信息]
+
+    U --&gt; V[延迟 1 秒]
+
+    V --&gt; W[重启系统]
+
+    W --&gt; A
+
+</code></pre> <pre><code class="language-mermaid">gantt
+    title 上海跨年旅游攻略甘特图
+    dateFormat  HH:mm
+    section 12月30日（周一）
+    中午到达酒店 :a, 12:00, 1h
+    南京路步行街小吃品尝 :after a, 13:00, 2h
+    上海邮政博物馆参观 :after prev, 15:00, 1h
+    乍浦路桥游览 :after prev, 16:00, 0.5h
+    沙美大楼参观 :after prev, 16:30, 0.5h
+    益丰外滩源游览 :after prev, 17:00, 1h
+    万国建筑博览群漫步 :after prev, 18:00, 1h
+    外滩夜景欣赏 :after prev, 19:00, 1.5h
+    黄浦江游船夜游 :after prev, 20:30, 1.5h
+    返回酒店休息 :after prev, 22:00, 0.5h
+
+    section 12月31日（周二）
+    全天迪士尼乐园游玩 :b, 08:00, 14h
+    迪士尼城堡烟花表演 :after b, 21:00, 1h
+
+    section 2025年1月1日（周三）
+    下午返回深圳 :c, 14:00, 2h
+</code></pre> </div> </article> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © Copyright 2026 Yang BIOSer. QR. Powered by <a href="https://jekyllrb.com/" target="_blank" rel="external nofollow noopener">Jekyll</a> with <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> theme. Hosted by <a href="https://pages.github.com/" target="_blank" rel="external nofollow noopener">GitHub Pages</a>. Photos from <a href="https://unsplash.com" target="_blank" rel="external nofollow noopener">Unsplash</a>. </div> </footer> <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script> <script src="/assets/js/bootstrap.bundle.min.js"></script> <script src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha256-Nn1q/fx0H7SNLZMQ5Hw5JLaTRZp0yILA/FRexe19VdI=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/imagesloaded@5.0.0/imagesloaded.pkgd.min.js" integrity="sha256-htrLFfZJ6v5udOG+3kNLINIKh2gvoKqwEhHYfTTMICc=" crossorigin="anonymous"></script> <script defer src="/assets/js/masonry.js?a0db7e5d5c70cc3252b3138b0c91dcaf" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/mermaid@10.7.0/dist/mermaid.min.js" integrity="sha256-TtLOdUA8mstPoO6sGvHIGx2ceXrrX4KgIItO06XOn8A=" crossorigin="anonymous"></script> <script defer src="/assets/js/mermaid-setup.js?38ca0a0126f7328d2d9a46bad640931f" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous"></script> <script defer src="/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer src="/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer src="/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer src="/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script async src="https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js"></script> <script async src="https://badge.dimensions.ai/badge.js"></script> <script defer type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" crossorigin="anonymous"></script> <script src="/assets/js/mathjax-setup.js?a5bb4e6a542c546dd929b24b8b236dfd"></script> <script defer src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6" crossorigin="anonymous"></script> <script defer src="/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script> <script type="module" src="/assets/js/search/ninja-keys.min.js?a3446f084dcaecc5f75aa1757d087dcf"></script> <ninja-keys hidebreadcrumbs noautoloadmdicons placeholder="Type to start searching"></ninja-keys> <script src="/assets/js/search-setup.js?6c304f7b1992d4b60f7a07956e52f04a"></script> <script src="/assets/js/search-data.js"></script> <script src="/assets/js/shortcut-key.js?6f508d74becd347268a7f822bca7309d"></script> </body> </html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html> <html lang="zh-CN"> <head> <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> <meta http-equiv="X-UA-Compatible" content="IE=edge"> <title> AMITse | Yang 的 BIOS 笔记 </title> <meta name="author" content="Yang BIOSer. QR"> <meta name="description" content="Setup / HII / TSE / Skia：AMITse，整理自个人 BIOS / UEFI 笔记。"> <meta name="keywords" content="BIOS, UEFI, EDK2, Firmware, PCIe, Debug"> <link rel="stylesheet" href="/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04"> <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" crossorigin="anonymous"> <link defer rel="stylesheet" href="/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5"> <link defer rel="stylesheet" href="/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772"> <link defer rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap"> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-github.css?591dab5a4e56573bf4ef7fd332894c99" media="" id="highlight_theme_light"> <link rel="shortcut icon" href="data:image/svg+xml,&lt;svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22&gt;&lt;text%20y=%22.9em%22%20font-size=%2290%22&gt;%E2%9A%9B%EF%B8%8F&lt;/text&gt;&lt;/svg&gt;"> <link rel="stylesheet" href="/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e"> <link rel="canonical" href="https://yang9301085.github.io//blog/notes/amitse-133a7a5a/"> <script src="/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" media="none" id="highlight_theme_dark"> <script>
+    initTheme();
+  </script> </head> <body class="fixed-top-nav sticky-bottom-footer"> <header> <nav id="navbar" class="navbar navbar-light navbar-expand-sm fixed-top" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="/"> Yang 的 BIOS 笔记 </a> <button class="navbar-toggler collapsed ml-auto" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item "> <a class="nav-link" href="/">Yang 的 BIOS 笔记 </a> </li> <li class="nav-item "> <a class="nav-link" href="/bios/">BIOS 笔记 </a> </li> <li class="nav-item active"> <a class="nav-link" href="/blog/">全部文章 </a> </li> <li class="nav-item"> <button id="search-toggle" title="Search" onclick="openSearchModal()"> <span class="nav-link">ctrl k <i class="ti ti-search"></i></span> </button> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="container mt-5" role="main"> <div class="post"> <header class="post-header"> <h1 class="post-title">AMITse</h1> <p class="post-meta"> 整理于 2026-09-28 </p> <p class="post-tags"> <a href="/blog/2026"> <i class="fa-solid fa-calendar fa-sm"></i> 2026 </a>   ·   <a href="/blog/tag/bios"> <i class="fa-solid fa-hashtag fa-sm"></i> BIOS</a>   <a href="/blog/tag/uefi"> <i class="fa-solid fa-hashtag fa-sm"></i> UEFI</a>   ·   <a href="/blog/category/setup"> <i class="fa-solid fa-tag fa-sm"></i> setup</a> </p> </header> <article class="post-content"> <p class="note-context"><a href="/bios/">返回 BIOS 专题索引</a> · 整理自个人笔记，平台相关结论以原记录环境为准。</p> <div id="table-of-contents"> <ul id="toc" class="section-nav"> <li class="toc-entry toc-h3"> <a href="#installprotocol">InstallProtocol:</a> <ul> <li class="toc-entry toc-h4"><a href="#registernotification">RegisterNotification</a></li> </ul> </li> </ul> </div> <hr> <div id="markdown-content"> <p>AMITSE is a firmware component that allows the user to manage platform configuration through setup pages and provides boot manager capabilities.</p> <p>AMITsePkg 结构</p> <pre><code class="language-C">AMITsePkg
+├─Board
+│  └─Em
+│      └─AMITSEBoard
+├─Core
+│  └─em
+│      └─AMITSE
+│          ├─Inc
+│          └─SignOn
+├─EDK
+│  └─MiniSetup
+│      ├─BootOnly
+│      │  ├─AMILogo
+│      │  └─PasswordEncode
+│      ├─Ezport
+│      ├─EzportPlus
+│      ├─GTSE
+│      │  ├─GcExt
+│      │  └─GtseSkin
+│      ├─JsonCapsule
+│      ├─Legacy
+│      ├─TseAdvanced
+│      │  └─AdvancedImages
+│      ├─TseLite
+│      │  └─StyleHook
+│      ├─TseOEM
+│      └─uefi2.1
+├─Include
+│  └─Protocol
+├─Library
+│  ├─AmiProgressReportLib
+│  ├─FileBrowser
+│  └─PasswordEncodeSmm
+└─TseEDKIIPkg
+</code></pre> <p>整个模块的入口：</p> <p><code class="language-plaintext highlighter-rouge">AmiTsePkg\EDK\MiniSetup\BootOnly\minisetup.c</code></p> <pre><code class="language-C">EFI_DRIVER_ENTRY_POINT (MiniSetupApplication)
+
+/**
+    This function is the entry point for TSE. It loads
+    resources like strings and setup-data. It registers
+    notification for console protocols. It Installs TSE
+    protocols.
+
+    @param ImageHandle
+    @param SystemTable
+
+    @retval Return Status based on errors that occurred in library
+        functions.
+**/
+EFI_STATUS MiniSetupApplication (
+        EFI_HANDLE ImageHandle,
+        EFI_SYSTEM_TABLE *SystemTable )
+{
+    EFI_STATUS	Status;
+    UINTN 		OptionSize = 0;
+    void 		*FirstBoot = NULL;
+    EFI_GUID	TseFirstBootGuid = TSE_FIRST_BOOT_GUID;
+
+    gImageHandle = ImageHandle;
+
+    EfiInitializeDriverLib ( ImageHandle, SystemTable );
+
+    RUNTIME_DEBUG( L"entry" );
+    if(TRUE == SetupEntryHook())
+        return EFI_UNSUPPORTED;
+#if APTIO_4_00 || SETUP_USE_GUIDED_SECTION
+#if TSE_USE_EDK_LIBRARY
+    LoadStrings(ImageHandle,&amp;gHiiHandle);
+#else
+#if TSE_BUILD_AS_APPLICATION
+    TSELoadStrings (ImageHandle,(EFI_HII_HANDLE*)&amp;gHiiHandle);
+#else
+    LoadStrings (ImageHandle,(EFI_HII_HANDLE*)&amp;gHiiHandle);
+#endif
+#endif
+#else
+#ifdef USE_DEPRICATED_INTERFACE
+    // Read in the strings from the GUIDed section
+    Status = LoadStringsDriverLib( ImageHandle, &amp;STRING_ARRAY_NAME );
+    if ( EFI_ERROR( Status ) )
+    {
+        return Status;
+    }
+#endif
+
+    Status = InitMiniSetupStrings();
+    if ( EFI_ERROR( Status ) )
+    {
+        return Status;
+    }
+#endif
+    gEfiShellFileGuid = TSEGetPCDptr();
+    Status = HiiInitializeProtocol();
+    if ( EFI_ERROR ( Status ) )
+        return Status;
+
+    //Override the STR_MAIN_TITLE and STR_MAIN_COPYRIGHT tokens to avoid the changes from uni.
+    OverrideTitleString();
+
+    // initialize screen buffer
+    RUNTIME_DEBUG( L"screen" );
+    InitializeScreenBuffer( EFI_BACKGROUND_BLACK | EFI_LIGHTGRAY );
+    if(IsTSEGopNotificationSupport())
+    {
+        if(!IsTseGopNotificiationFuncitonInstalled)
+        {
+            NotificatonFunctionForGop();
+            IsTseGopNotificiationFuncitonInstalled =TRUE;
+        }
+    }
+    RUNTIME_DEBUG( L"guid" );
+
+    Status = InitApplicationData(ImageHandle);
+    if ( EFI_ERROR( Status ) )
+    {
+        return MiniSetupExit( Status );
+    }
+
+    RUNTIME_DEBUG( L"globals" );
+    InitGlobalPointers();
+    UpdategScreenParams ();
+
+    Status = VarLoadVariables( (VOID **)&amp;gVariableList, NULL );
+    if ( EFI_ERROR( Status ) )
+    {
+        return Status;
+    }
+#if TSE_BUILD_AS_APPLICATION
+    GetArgumentsFromImage (ImageHandle, &amp;gArgv, &amp;gArgCount);
+#endif
+    MinisetupDriverEntryHookHook();
+
+    gPostStatus = TSE_POST_STATUS_BEFORE_POST_SCREEN;
+
+#ifndef STANDALONE_APPLICATION
+    // Install our handshake protocol
+    BootGetLanguages();
+    InstallProtocol();
+
+    // Register any notification 'callbacks' that we need
+    Status = RegisterNotification();
+    if ( EFI_ERROR( Status ) )
+        UninstallProtocol();
+#else
+    PostManagerHandshake();
+#endif // STANDALONE_APPLICATION
+
+    if (TseDefaultSetupPasswordSupported ())
+    {
+        FirstBoot = (BOOT_OPTION *)VarGetNvramName (L"TseFirstBootFlag", &amp;TseFirstBootGuid, NULL, &amp;OptionSize);
+        if (NULL == FirstBoot)
+        {
+            SetDefaultPassword (); //Get default password, if any present in SDL, and set default pass to NVRAM
+            VarSetNvramName( L"TseFirstBootFlag", &amp;TseFirstBootGuid, EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_NON_VOLATILE, &amp;OptionSize, sizeof (OptionSize) );
+        }
+        if(FirstBoot) //For MemoryLeak Fix
+            MemFreePointer((void **) &amp;FirstBoot);
+    }
+    return Status;
+}
+
+</code></pre> <pre><code class="language-mermaid">graph TD
+    classDef startend fill:#F5EBFF,stroke:#BE8FED,stroke-width:2px;
+    classDef process fill:#E5F6FF,stroke:#73A6FF,stroke-width:2px;
+    classDef decision fill:#FFF6CC,stroke:#FFBC52,stroke-width:2px;
+
+    A([开始]):::startend --&gt; B(初始化变量):::process
+    B --&gt; C(初始化驱动库):::process
+    C --&gt; D(记录调试信息 entry):::process
+    D --&gt; E{SetupEntryHook 返回 TRUE?}:::decision
+    E -- 是 --&gt; F([返回 EFI_UNSUPPORTED]):::startend
+    E -- 否 --&gt; G(根据宏条件加载字符串):::process
+    G --&gt; H(获取 PCD 指针):::process
+    H --&gt; I(初始化 HII 协议):::process
+    I --&gt; J{协议初始化失败?}:::decision
+    J -- 是 --&gt; K([返回错误状态]):::startend
+    J -- 否 --&gt; L(覆盖标题字符串):::process
+    L --&gt; M(记录调试信息 screen):::process
+    M --&gt; N(初始化屏幕缓冲区):::process
+    N --&gt; O{IsTSEGopNotificationSupport?}:::decision
+    O -- 是 --&gt; P{IsTseGopNotificiationFuncitonInstalled?}:::decision
+    P -- 否 --&gt; Q(设置 GOP 通知):::process
+    Q --&gt; R(设置 IsTseGopNotificiationFuncitonInstalled = TRUE):::process
+    P -- 是 --&gt; S(记录调试信息 guid):::process
+    R --&gt; S
+    O -- 否 --&gt; S
+    S --&gt; T(初始化应用数据):::process
+    T --&gt; U{应用数据初始化失败?}:::decision
+    U -- 是 --&gt; V(调用 MiniSetupExit):::process
+    V --&gt; W([返回 MiniSetupExit 结果]):::startend
+    U -- 否 --&gt; X(记录调试信息 globals):::process
+    X --&gt; Y(初始化全局指针):::process
+    Y --&gt; Z(更新屏幕参数):::process
+    Z --&gt; AA(加载变量):::process
+    AA --&gt; AB{变量加载失败?}:::decision
+    AB -- 是 --&gt; K
+    AB -- 否 --&gt; AC{是否为应用程序构建?}:::decision
+    AC -- 是 --&gt; AD(获取命令行参数):::process
+    AC -- 否 --&gt; AE(执行钩子函数):::process
+    AD --&gt; AE
+    AE --&gt; AF(设置 gPostStatus):::process
+    AF --&gt; AG{是否为独立应用?}:::decision
+    AG -- 是 --&gt; AH(调用 PostManagerHandshake):::process
+    AG -- 否 --&gt; AI(调用 BootGetLanguages):::process
+    AI --&gt; AJ(InstallProtocol):::process
+    AJ --&gt; AK(RegisterNotification):::process
+    AK --&gt; AL{RegisterNotification失败?}:::decision
+    AL -- 是 --&gt; AM(卸载协议):::process
+    AL -- 否 --&gt; AN(检查默认密码支持):::process
+    AM --&gt; AN
+    AH --&gt; AN
+    AN --&gt; AO{支持默认密码?}:::decision
+    AO -- 是 --&gt; AP(获取 FirstBoot):::process
+    AP --&gt; AQ{FirstBoot 为 NULL?}:::decision
+    AQ -- 是 --&gt; AR(设置默认密码):::process
+    AR --&gt; AS(设置 TseFirstBootFlag):::process
+    AS --&gt; AT(释放 FirstBoot 内存):::process
+    AQ -- 否 --&gt; AT
+    AO -- 否 --&gt; AU([返回 Status]):::startend
+    AT --&gt; AU
+</code></pre> <hr> <p>MiniSetupApplication中两个重要的模块： <code class="language-plaintext highlighter-rouge">InstallProtocol</code>和<code class="language-plaintext highlighter-rouge">RegisterNotification</code></p> <h3 id="installprotocol"> <code class="language-plaintext highlighter-rouge">InstallProtocol</code>:</h3> <p><code class="language-plaintext highlighter-rouge">AmiTsePkg\EDK\MiniSetup\BootOnly\protocol.c</code></p> <pre><code class="language-C">/**
+    This function installs different protocols exported.
+    @param VOID
+    @retval Return Status based on errors that occurred in library
+        functions.
+**/
+EFI_STATUS InstallProtocol( VOID )
+{
+    EFI_STATUS Status;
+
+    Status = gBS-&gt;InstallMultipleProtocolInterfaces(
+            &amp;gProtocolHandle,
+            &amp;gAmiPostManagerProtocolGuid, &amp;gPostManagerProtocol,
+#ifdef USE_COMPONENT_NAME
+            &amp;gEfiComponentNameProtocolGuid, &amp;gComponentName,
+#endif
+            NULL
+            );
+    if ( !EFI_ERROR( Status ) )
+    {
+        Status = InstallFormBrowserProtocol(gProtocolHandle);
+        Status = InstallInvalBGRTStatusProtocol (gProtocolHandle);
+        Status = InstallScreenMgmtProtocol (gProtocolHandle);
+        Status = InstallHiiPopupProtocol(gProtocolHandle);
+    }
+
+    return Status;
+}
+</code></pre> <p>InstallProtocol会安装 <a href="/blog/notes/ami-post-manager-protocol-bc0b7598/">AMI POST Manager Protocol</a> <code class="language-plaintext highlighter-rouge">TSE_INVALIDATE_BGRT_STATUS_PROTOCOL</code> <code class="language-plaintext highlighter-rouge">EFI_FORM_BROWSER2_PROTOCOL</code> <code class="language-plaintext highlighter-rouge">AMI_TSE_SCREEN_MGMT_PROTOCOL</code> <code class="language-plaintext highlighter-rouge">EFI_HII_POPUP_PROTOCOL</code></p> <hr> <h4 id="registernotification">RegisterNotification</h4> <p><a href="/blog/notes/registernotification-9e552407/">RegisterNotification</a></p> </div> </article> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © Copyright 2026 Yang BIOSer. QR. Powered by <a href="https://jekyllrb.com/" target="_blank" rel="external nofollow noopener">Jekyll</a> with <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> theme. Hosted by <a href="https://pages.github.com/" target="_blank" rel="external nofollow noopener">GitHub Pages</a>. Photos from <a href="https://unsplash.com" target="_blank" rel="external nofollow noopener">Unsplash</a>. </div> </footer> <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script> <script src="/assets/js/bootstrap.bundle.min.js"></script> <script src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha256-Nn1q/fx0H7SNLZMQ5Hw5JLaTRZp0yILA/FRexe19VdI=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/imagesloaded@5.0.0/imagesloaded.pkgd.min.js" integrity="sha256-htrLFfZJ6v5udOG+3kNLINIKh2gvoKqwEhHYfTTMICc=" crossorigin="anonymous"></script> <script defer src="/assets/js/masonry.js?a0db7e5d5c70cc3252b3138b0c91dcaf" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/mermaid@10.7.0/dist/mermaid.min.js" integrity="sha256-TtLOdUA8mstPoO6sGvHIGx2ceXrrX4KgIItO06XOn8A=" crossorigin="anonymous"></script> <script defer src="/assets/js/mermaid-setup.js?38ca0a0126f7328d2d9a46bad640931f" type="text/javascript"></script> <script defer src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous"></script> <script defer src="/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer src="/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer src="/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer src="/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script async src="https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js"></script> <script async src="https://badge.dimensions.ai/badge.js"></script> <script defer type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" crossorigin="anonymous"></script> <script src="/assets/js/mathjax-setup.js?a5bb4e6a542c546dd929b24b8b236dfd"></script> <script defer src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6" crossorigin="anonymous"></script> <script defer src="/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script> <script type="module" src="/assets/js/search/ninja-keys.min.js?a3446f084dcaecc5f75aa1757d087dcf"></script> <ninja-keys hidebreadcrumbs noautoloadmdicons placeholder="Type to start searching"></ninja-keys> <script src="/assets/js/search-setup.js?6c304f7b1992d4b60f7a07956e52f04a"></script> <script src="/assets/js/search-data.js"></script> <script src="/assets/js/shortcut-key.js?6f508d74becd347268a7f822bca7309d"></script> </body> </html>
