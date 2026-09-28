@@ -11,3 +11,6 @@ reddit.com
 ^https://www\.ablic\.com/en/semicon/wp-content/uploads/2020/01/wdt_operation_window_en\.png$
 ^https://www\.ablic\.com/en/semicon/wp-content/uploads/2020/01/wdt_operation_q-and-a_en\.png$
 ^https://www\.ablic\.com/en/semicon/wp-content/uploads/2020/01/wdt_inhoused-in-mcu_en\.png$
+
+# Template photo attribution redirects to an authentication page (HTTP 401 in CI).
+^https://unsplash\.com/$
