@@ -1,2 +1,13 @@
 linkedin.com
 reddit.com
+
+# 2026-09-28: these exact URLs return HTTP 403 to CI and local HTTP clients.
+# They remain in the notes for manual review; exclusion is NOT proof of availability.
+# Do not accept all 403 responses or exclude entire domains.
+^https://uefi\.org/$
+^https://www\.ablic\.com/en/semicon/wp-content/uploads/2020/01/wdt_mcu_en\.png$
+^https://www\.ablic\.com/en/semicon/wp-content/uploads/2020/01/wdt_operation_timeout_en\.png$
+^https://www\.ablic\.com/en/semicon/wp-content/uploads/2020/01/wdt_operation_timeout_2_en\.png$
+^https://www\.ablic\.com/en/semicon/wp-content/uploads/2020/01/wdt_operation_window_en\.png$
+^https://www\.ablic\.com/en/semicon/wp-content/uploads/2020/01/wdt_operation_q-and-a_en\.png$
+^https://www\.ablic\.com/en/semicon/wp-content/uploads/2020/01/wdt_inhoused-in-mcu_en\.png$

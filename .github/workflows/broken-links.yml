@@ -12,6 +12,10 @@ on:
       - "**.liquid"
       - "**/*.md"
       - "**.yml"
+      - ".lycheeignore"
+      - "Gemfile"
+      - "Gemfile.lock"
+      - "tools/check_bios_site.py"
       - "!.github/workflows/axe.yml"
       - "!.github/workflows/deploy-docker-tag.yml"
       - "!.github/workflows/deploy-image.yml"
@@ -30,6 +34,10 @@ on:
       - "**.liquid"
       - "**/*.md"
       - "**.yml"
+      - ".lycheeignore"
+      - "Gemfile"
+      - "Gemfile.lock"
+      - "tools/check_bios_site.py"
       - "!.github/workflows/axe.yml"
       - "!.github/workflows/deploy-docker-tag.yml"
       - "!.github/workflows/deploy-image.yml"
@@ -44,9 +52,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3.5"
+          bundler: "2.6.2"
+          bundler-cache: true
+
+      - name: Build the current revision
+        env:
+          JEKYLL_ENV: production
+        run: bundle exec jekyll build
+
+      - name: Check BIOS pages, local links and anchors
+        run: python3 tools/check_bios_site.py
+
       - name: Link Checker 🔗
         uses: lycheeverse/lychee-action@v2.1.0
         with:
           fail: true
-          # removed md files that include liquid tags
-          args: --user-agent 'curl/7.54' --exclude-path README.md --exclude-path CUSTOMIZE.md --exclude-path _pages/404.md --exclude-path _pages/blog.md --exclude-path _posts/2018-12-22-distill.md --exclude-path _posts/2023-04-24-videos.md --verbose --no-progress './**/*.md' './**/*.html'
+          lycheeVersion: v0.17.0
+          # Resolve site-root URLs against this build, not the runner filesystem.
+          # Keep the template documentation in coverage without scanning Liquid source.
+          args: >-
+            --root-dir '${{ github.workspace }}/_site'
+            --user-agent 'curl/7.54' --verbose --no-progress
+            '_site/**/*.html' FAQ.md INSTALL.md CONTRIBUTING.md
